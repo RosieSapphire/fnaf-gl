@@ -8,6 +8,7 @@ uint32_t texture_create(const char *path, const uint32_t wrap_mode, const uint32
 	int32_t texture_width, texture_height, texture_format;
 	uint8_t *texture_data;
 	uint32_t texture;
+	uint32_t texture_format_enum;
 
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
@@ -23,7 +24,25 @@ uint32_t texture_create(const char *path, const uint32_t wrap_mode, const uint32
 		return 1;
 	}
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texture_width, texture_height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
+	switch(texture_format) {
+		case 1:
+			texture_format_enum = GL_RED;
+			break;
+
+		case 3:
+			texture_format_enum = GL_RGB;
+			break;
+
+		case 4:
+			texture_format_enum = GL_RGBA;
+			break;
+
+		default:
+			printf("ERROR: Unreadable texture byte-alignment.\n");
+			texture_format_enum = 0;
+			return 0;
+	}
+	glTexImage2D(GL_TEXTURE_2D, 0, texture_format_enum, texture_width, texture_height, 0, texture_format_enum, GL_UNSIGNED_BYTE, texture_data);
 	stbi_image_free(texture_data);
 
 	return texture;

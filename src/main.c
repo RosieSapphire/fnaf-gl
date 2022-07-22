@@ -10,18 +10,36 @@
 #include "texture.h"
 #include "sprite.h"
 #include "shader.h"
+#include "mouse.h"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
-#define WINDOW_WIDTH			1280
-#define WINDOW_HEIGHT			720
+#define WINDOW_WIDTH					1280
+#define WINDOW_HEIGHT					720
 
-#define ANIMATION_FRAMETIME		0.01666667f
+#define ANIMATION_FRAMETIME				0.01666667f
+
+#define DOOR_BUTTON_LEFT_DOOR_FLAG		0x1
+#define DOOR_BUTTON_LEFT_LIGHT_FLAG		0x2
+#define DOOR_BUTTON_RIGHT_DOOR_FLAG		0x4
+#define DOOR_BUTTON_RIGHT_LIGHT_FLAG	0x8
+
+#define DOOR_BUTTON_LEFT_00_INDEX		0
+#define DOOR_BUTTON_LEFT_01_INDEX		1
+#define DOOR_BUTTON_LEFT_10_INDEX		2
+#define DOOR_BUTTON_LEFT_11_INDEX		3
+#define DOOR_BUTTON_RIGHT_00_INDEX		4
+#define DOOR_BUTTON_RIGHT_01_INDEX		5
+#define DOOR_BUTTON_RIGHT_10_INDEX		6
+#define DOOR_BUTTON_RIGHT_11_INDEX		7
 
 int main() {
 	ivec2 monitor_size;
 	GLFWwindow *window;
+
+	ivec2 mouse_position;
+	uint8_t mouse_has_clicked = 0;
 
 	uint32_t fbo;
 	uint32_t rbo;
@@ -38,9 +56,15 @@ int main() {
 
 	sprite_t office_sprite;
 	uint32_t office_texture;
+
 	sprite_t fan_animation_sprite;
 	uint32_t fan_animation_textures[3];
 	uint32_t fan_animation_frame = 0;
+
+	sprite_t door_button_left_sprite;
+	sprite_t door_button_right_sprite;
+	uint32_t door_button_textures[8];
+	uint8_t door_button_flags = 0;
 
 	uint32_t sprite_shader_program;
 
@@ -112,6 +136,20 @@ int main() {
 	fan_animation_textures[2] = texture_create("resources/textures/office/fan/02.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
 	sprite_create(&fan_animation_sprite, fan_animation_textures[0], (vec2){137.0f, 196.0f});
 	sprite_set_position(&fan_animation_sprite, (vec3){780.0f, 303.0f});
+
+	door_button_textures[0] = texture_create("resources/textures/office/doors/buttons/left-00.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+	door_button_textures[1] = texture_create("resources/textures/office/doors/buttons/left-01.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+	door_button_textures[2] = texture_create("resources/textures/office/doors/buttons/left-10.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+	door_button_textures[3] = texture_create("resources/textures/office/doors/buttons/left-11.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+	sprite_create(&door_button_left_sprite, door_button_textures[0], (vec2){92.0f, 247.0f});
+	sprite_set_position(&door_button_left_sprite, (vec2){6.0f, 263.0f});
+
+	door_button_textures[4] = texture_create("resources/textures/office/doors/buttons/right-00.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+	door_button_textures[5] = texture_create("resources/textures/office/doors/buttons/right-01.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+	door_button_textures[6] = texture_create("resources/textures/office/doors/buttons/right-10.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+	door_button_textures[7] = texture_create("resources/textures/office/doors/buttons/right-11.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+	sprite_create(&door_button_right_sprite, door_button_textures[4], (vec2){92.0f, 247.0f});
+	sprite_set_position(&door_button_right_sprite, (vec2){1497.0f, 273.0f});
 
 	{ /* load freetype */
 		FT_Library freetype;
@@ -247,12 +285,11 @@ int main() {
 			render_wireframe_pressed = 0;
 		}
 
+		mouse_get_position(window, mouse_position);
 		{ /* use mouse to look around office */
-			double mouse_x;
 			float mouse_distance_from_center;
-			glfwGetCursorPos(window, &mouse_x, NULL);
+			mouse_distance_from_center = mouse_position[0] - (WINDOW_WIDTH / 2.0f);
 
-			mouse_distance_from_center = mouse_x - (WINDOW_WIDTH / 2.0f);
 			if(mouse_distance_from_center < -640.0f) {
 				mouse_distance_from_center = -640.0f;
 			}
@@ -274,7 +311,55 @@ int main() {
 			}
 		}
 
+		/* check for clicking door buttons */
+		if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS && !mouse_has_clicked) {
+			int32_t mouse_offset = (int32_t)office_look_current;
+			door_button_flags ^= DOOR_BUTTON_LEFT_DOOR_FLAG *	mouse_inside_box(window, (ivec4){27		+ mouse_offset, 89		+ mouse_offset, 251, 371});
+			door_button_flags ^= DOOR_BUTTON_LEFT_LIGHT_FLAG *	mouse_inside_box(window, (ivec4){25 	+ mouse_offset, 87 	 	+ mouse_offset, 393, 513});
+			door_button_flags ^= DOOR_BUTTON_RIGHT_DOOR_FLAG * 	mouse_inside_box(window, (ivec4){1519	+ mouse_offset, 1581 	+ mouse_offset, 267, 387});
+			door_button_flags ^= DOOR_BUTTON_RIGHT_LIGHT_FLAG * mouse_inside_box(window, (ivec4){1519	+ mouse_offset, 1581	+ mouse_offset, 398, 518});
+
+			if(door_button_flags & DOOR_BUTTON_LEFT_DOOR_FLAG) {
+				if(door_button_flags & DOOR_BUTTON_LEFT_LIGHT_FLAG) {
+					door_button_left_sprite.texture = door_button_textures[DOOR_BUTTON_LEFT_11_INDEX];
+				} else {
+					door_button_left_sprite.texture = door_button_textures[DOOR_BUTTON_LEFT_10_INDEX];
+				}
+			} else {
+				if(door_button_flags & DOOR_BUTTON_LEFT_LIGHT_FLAG) {
+					door_button_left_sprite.texture = door_button_textures[DOOR_BUTTON_LEFT_01_INDEX];
+				} else {
+					door_button_left_sprite.texture = door_button_textures[DOOR_BUTTON_LEFT_00_INDEX];
+				}
+			}
+
+			if(door_button_flags & DOOR_BUTTON_RIGHT_DOOR_FLAG) {
+				if(door_button_flags & DOOR_BUTTON_RIGHT_LIGHT_FLAG) {
+					door_button_right_sprite.texture = door_button_textures[DOOR_BUTTON_RIGHT_11_INDEX];
+				} else {
+					door_button_right_sprite.texture = door_button_textures[DOOR_BUTTON_RIGHT_10_INDEX];
+				}
+			} else {
+				if(door_button_flags & DOOR_BUTTON_RIGHT_LIGHT_FLAG) {
+					door_button_right_sprite.texture = door_button_textures[DOOR_BUTTON_RIGHT_01_INDEX];
+				} else {
+					door_button_right_sprite.texture = door_button_textures[DOOR_BUTTON_RIGHT_00_INDEX];
+				}
+			}
+
+			mouse_has_clicked = 1;
+		}
+
+		if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_RELEASE) {
+			mouse_has_clicked = 0;
+		}
+
 		/* update */
+		printf("Door Flags: %d", (door_button_flags & DOOR_BUTTON_RIGHT_LIGHT_FLAG) > 0);
+		printf("%d", (door_button_flags & DOOR_BUTTON_RIGHT_DOOR_FLAG) > 0);
+		printf("%d", (door_button_flags & DOOR_BUTTON_LEFT_LIGHT_FLAG) > 0);
+		printf("%d\n", (door_button_flags & DOOR_BUTTON_LEFT_DOOR_FLAG) > 0);
+
 		animation_timer += time_delta;
 		if(animation_timer > ANIMATION_FRAMETIME) {
 			animation_timer = 0.0f;
@@ -304,6 +389,8 @@ int main() {
 		glUniform1i(glGetUniformLocation(sprite_shader_program, "follow_camera"), 0);
 		sprite_draw(office_sprite, sprite_shader_program);
 		sprite_draw(fan_animation_sprite, sprite_shader_program);
+		sprite_draw(door_button_left_sprite, sprite_shader_program);
+		sprite_draw(door_button_right_sprite, sprite_shader_program);
 
 		/*
 		glUseProgram(font_shader_program);

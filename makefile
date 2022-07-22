@@ -4,8 +4,8 @@ LIB=-lglfw -lGL -lX11 -lpthread -lXrandr -ldl -lcglm -lfreetype -lm
 
 CFLAGS=-std=c99
 
-SRC=main.c glad.c file.c glyph.c texture.c sprite.c shader.c
-OBJ=main.o glad.o file.o glyph.o texture.o sprite.o shader.o
+SRC=main.c glad.c file.c glyph.c texture.c sprite.c shader.c mouse.c
+OBJ=main.o glad.o file.o glyph.o texture.o sprite.o shader.o mouse.o
 
 BIN=five_nights_at_freddys
 
