@@ -314,11 +314,22 @@ int main() {
 		/* check for clicking door buttons */
 		if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS && !mouse_has_clicked) {
 			int32_t mouse_offset = (int32_t)office_look_current;
+			uint8_t door_button_flags_old = door_button_flags;
 			door_button_flags ^= DOOR_BUTTON_LEFT_DOOR_FLAG *	mouse_inside_box(window, (ivec4){27		+ mouse_offset, 89		+ mouse_offset, 251, 371});
 			door_button_flags ^= DOOR_BUTTON_LEFT_LIGHT_FLAG *	mouse_inside_box(window, (ivec4){25 	+ mouse_offset, 87 	 	+ mouse_offset, 393, 513});
 			door_button_flags ^= DOOR_BUTTON_RIGHT_DOOR_FLAG * 	mouse_inside_box(window, (ivec4){1519	+ mouse_offset, 1581 	+ mouse_offset, 267, 387});
 			door_button_flags ^= DOOR_BUTTON_RIGHT_LIGHT_FLAG * mouse_inside_box(window, (ivec4){1519	+ mouse_offset, 1581	+ mouse_offset, 398, 518});
 
+			/* handle cases where both lights are toggled */
+			if((door_button_flags & DOOR_BUTTON_LEFT_LIGHT_FLAG) && (door_button_flags_old & DOOR_BUTTON_RIGHT_LIGHT_FLAG)) {
+				door_button_flags &= ~DOOR_BUTTON_RIGHT_LIGHT_FLAG;
+			}
+
+			if((door_button_flags & DOOR_BUTTON_RIGHT_LIGHT_FLAG) && (door_button_flags_old & DOOR_BUTTON_LEFT_LIGHT_FLAG)) {
+				door_button_flags &= ~DOOR_BUTTON_LEFT_LIGHT_FLAG;
+			}
+
+			/* update button textures */
 			if(door_button_flags & DOOR_BUTTON_LEFT_DOOR_FLAG) {
 				if(door_button_flags & DOOR_BUTTON_LEFT_LIGHT_FLAG) {
 					door_button_left_sprite.texture = door_button_textures[DOOR_BUTTON_LEFT_11_INDEX];
