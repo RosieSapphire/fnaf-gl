@@ -9,26 +9,38 @@
 #include "glyph.h"
 #include "texture.h"
 #include "sprite.h"
+#include "shader.h"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
-#define WINDOW_WIDTH	1280
-#define WINDOW_HEIGHT	720
+#define WINDOW_WIDTH			1280
+#define WINDOW_HEIGHT			720
+
+#define ANIMATION_FRAMETIME		0.01666667f
 
 int main() {
 	ivec2 monitor_size;
 	GLFWwindow *window;
 
+	uint32_t fbo;
+	uint32_t rbo;
+	uint32_t render_vao;
+	uint32_t render_vbo;
+
 	double time_now, time_last;
+	float animation_timer = 0.0f;
 
 	uint8_t render_wireframe = 0;
 	uint8_t render_wireframe_pressed = 0;
+	uint32_t render_texture;
+	uint32_t render_shader_program;
 
 	sprite_t office_sprite;
 	uint32_t office_texture;
-	sprite_t test_sprite;
-	uint32_t test_texture;
+	sprite_t fan_animation_sprite;
+	uint32_t fan_animation_textures[3];
+	uint32_t fan_animation_frame = 0;
 
 	uint32_t sprite_shader_program;
 
@@ -86,155 +98,20 @@ int main() {
 	glm_mat4_copy(GLM_MAT4_IDENTITY, matrix_view);
 	glm_mat4_copy(GLM_MAT4_IDENTITY, matrix_office);
 
-	{ /* load office shaders */
-		char *office_shader_vertex_source;
-		char *office_shader_fragment_source;
-		uint32_t office_shader_vertex;
-		uint32_t office_shader_fragment;
-
-		office_shader_vertex_source = file_load_contents("resources/shaders/sprite_vertex.glsl");
-		if(!office_shader_vertex_source) {
-			printf("ERROR: Vertex shader loading fucked up.\n");
-			return 1;
-		}
-
-		office_shader_fragment_source = file_load_contents("resources/shaders/sprite_fragment.glsl");
-		if(!office_shader_fragment_source) {
-			printf("ERROR: Fragment shader loading fucked up.\n");
-			return 1;
-		}
-
-		office_shader_vertex = glCreateShader(GL_VERTEX_SHADER);
-		glShaderSource(office_shader_vertex, 1, (const char *const *)(&office_shader_vertex_source), NULL);
-		glCompileShader(office_shader_vertex);
-
-		{ /* check vertex shader errors */
-			int32_t success;
-			char info_log[512];
-			glGetShaderiv(office_shader_vertex, GL_COMPILE_STATUS, &success);
-			if(!success) {
-				glGetShaderInfoLog(office_shader_vertex, 512, NULL, info_log);
-				printf("ERROR: Vertex shader fucked up: %s\n", info_log);
-				return 1;
-			}
-		}
-
-		office_shader_fragment = glCreateShader(GL_FRAGMENT_SHADER);
-		glShaderSource(office_shader_fragment, 1, (const char *const *)(&office_shader_fragment_source), NULL);
-		glCompileShader(office_shader_fragment);
-
-		{ /* check vertex shader errors */
-			int32_t success;
-			char info_log[512];
-			glGetShaderiv(office_shader_fragment, GL_COMPILE_STATUS, &success);
-			if(!success) {
-				glGetShaderInfoLog(office_shader_fragment, 512, NULL, info_log);
-				printf("ERROR: Fragment shader fucked up: %s\n", info_log);
-				return 1;
-			}
-		}
-
-		free(office_shader_fragment_source);
-		free(office_shader_vertex_source);
-
-		/* link office program */
-		sprite_shader_program = glCreateProgram();
-		glAttachShader(sprite_shader_program, office_shader_vertex);
-		glAttachShader(sprite_shader_program, office_shader_fragment);
-		glLinkProgram(sprite_shader_program);
-
-		{ /* check shader program errors */
-			int32_t success;
-			char info_log[512];
-			glGetProgramiv(sprite_shader_program, GL_LINK_STATUS, &success);
-			if(!success) {
-				glGetProgramInfoLog(sprite_shader_program, 512, NULL, info_log);
-				printf("ERROR: Shader program fucked up: %s\n", info_log);
-				return 1;
-			}
-		}
-		glDeleteShader(office_shader_fragment);
-		glDeleteShader(office_shader_vertex);
-	}
+	/* create shaders */
+	render_shader_program = shader_create("resources/shaders/render_vertex.glsl", "resources/shaders/render_fragment.glsl");
+	font_shader_program = shader_create("resources/shaders/font_vertex.glsl", "resources/shaders/font_fragment.glsl");
+	sprite_shader_program = shader_create("resources/shaders/sprite_vertex.glsl", "resources/shaders/sprite_fragment.glsl");
 
 	/* set up sprites */
 	office_texture = texture_create("resources/textures/office/states/normal.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
 	sprite_create(&office_sprite, office_texture, (vec2){1600.0f, 720.0f});
 
-	test_texture = texture_create("resources/textures/test.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
-	sprite_create(&test_sprite, test_texture, (vec2){128.0f, 128.0f});
-
-	{ /* load font shaders */
-		char *font_shader_vertex_source;
-		char *font_shader_fragment_source;
-		uint32_t font_shader_vertex;
-		uint32_t font_shader_fragment;
-
-		font_shader_vertex_source = file_load_contents("resources/shaders/font_vertex.glsl");
-
-		if(!font_shader_vertex_source) {
-			printf("ERROR: Vertex shader loading fucked up.\n");
-			return 1;
-		}
-
-		font_shader_fragment_source = file_load_contents("resources/shaders/font_fragment.glsl");
-		if(!font_shader_fragment_source) {
-			printf("ERROR: Fragment shader loading fucked up.\n");
-			return 1;
-		}
-
-		font_shader_vertex = glCreateShader(GL_VERTEX_SHADER);
-		glShaderSource(font_shader_vertex, 1, (const char *const *)(&font_shader_vertex_source), NULL);
-		glCompileShader(font_shader_vertex);
-
-		{ /* check vertex shader errors */
-			int32_t success;
-			char info_log[512];
-			glGetShaderiv(font_shader_vertex, GL_COMPILE_STATUS, &success);
-			if(!success) {
-				glGetShaderInfoLog(font_shader_vertex, 512, NULL, info_log);
-				printf("ERROR: Vertex shader fucked up: %s\n", info_log);
-				return 1;
-			}
-		}
-
-		font_shader_fragment = glCreateShader(GL_FRAGMENT_SHADER);
-		glShaderSource(font_shader_fragment, 1, (const char *const *)(&font_shader_fragment_source), NULL);
-		glCompileShader(font_shader_fragment);
-
-		{ /* check vertex shader errors */
-			int32_t success;
-			char info_log[512];
-			glGetShaderiv(font_shader_fragment, GL_COMPILE_STATUS, &success);
-			if(!success) {
-				glGetShaderInfoLog(font_shader_fragment, 512, NULL, info_log);
-				printf("ERROR: Fragment shader fucked up: %s\n", info_log);
-				return 1;
-			}
-		}
-
-		free(font_shader_fragment_source);
-		free(font_shader_vertex_source);
-
-		/* link font program */
-		font_shader_program = glCreateProgram();
-		glAttachShader(font_shader_program, font_shader_vertex);
-		glAttachShader(font_shader_program, font_shader_fragment);
-		glLinkProgram(font_shader_program);
-
-		{ /* check shader program errors */
-			int32_t success;
-			char info_log[512];
-			glGetProgramiv(font_shader_program, GL_LINK_STATUS, &success);
-			if(!success) {
-				glGetProgramInfoLog(font_shader_program, 512, NULL, info_log);
-				printf("ERROR: Shader program fucked up: %s\n", info_log);
-				return 1;
-			}
-		}
-		glDeleteShader(font_shader_fragment);
-		glDeleteShader(font_shader_vertex);
-	}
+	fan_animation_textures[0] = texture_create("resources/textures/office/fan/00.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+	fan_animation_textures[1] = texture_create("resources/textures/office/fan/01.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+	fan_animation_textures[2] = texture_create("resources/textures/office/fan/02.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+	sprite_create(&fan_animation_sprite, fan_animation_textures[0], (vec2){137.0f, 196.0f});
+	sprite_set_position(&fan_animation_sprite, (vec3){780.0f, 303.0f});
 
 	{ /* load freetype */
 		FT_Library freetype;
@@ -300,6 +177,54 @@ int main() {
 	time_now = glfwGetTime();
 	time_last = time_now;
 
+	/* set up framebuffer */
+	glGenFramebuffers(1, &fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+	glGenTextures(1, &render_texture);
+	glBindTexture(GL_TEXTURE_2D, render_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WINDOW_WIDTH, WINDOW_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, render_texture, 0);
+
+	/* set up renderbuffer */
+	glGenRenderbuffers(1, &rbo);
+	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, WINDOW_WIDTH, WINDOW_HEIGHT);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+		printf("ERROR: Framebuffer fucked up.\n");
+		return 1;
+	}
+
+	{/* generate buffers for render texture */
+		float render_vertices[] = {
+			-1.0f,	-1.0f,	0.0f, 0.0f,
+			 1.0f,	-1.0f,	1.0f, 0.0f,
+			 1.0f,	 1.0f,	1.0f, 1.0f,
+
+			-1.0f,	-1.0f,	0.0f, 0.0f,
+			 1.0f,	 1.0f,	1.0f, 1.0f,
+			-1.0f,	 1.0f,	0.0f, 1.0f,
+		};
+
+		glGenVertexArrays(1, &render_vao);
+		glBindVertexArray(render_vao);
+
+		glGenBuffers(1, &render_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, render_vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, render_vertices, GL_STATIC_DRAW);
+
+		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
+		glEnableVertexAttribArray(0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindVertexArray(0);
+	}
+
 	/* main loop */
 	while(!glfwWindowShouldClose(window)) {
 		/* calculate deltatime */
@@ -350,11 +275,20 @@ int main() {
 		}
 
 		/* update */
+		animation_timer += time_delta;
+		if(animation_timer > ANIMATION_FRAMETIME) {
+			animation_timer = 0.0f;
+			fan_animation_frame++;
+			fan_animation_frame %= 3;
+			fan_animation_sprite.texture = fan_animation_textures[fan_animation_frame];
+		}
+
 		glm_mat4_copy(GLM_MAT4_IDENTITY, matrix_view);
 		glm_translate(matrix_view, (vec3){office_look_current, 0.0f, 0.0f});
 
 		/* draw */
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 		if(render_wireframe) {
 			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -368,12 +302,8 @@ int main() {
 		glUniformMatrix4fv(glGetUniformLocation(sprite_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
 
 		glUniform1i(glGetUniformLocation(sprite_shader_program, "follow_camera"), 0);
-		glUniform1i(glGetUniformLocation(sprite_shader_program, "use_perspective"), 1);
 		sprite_draw(office_sprite, sprite_shader_program);
-
-		glUniform1i(glGetUniformLocation(sprite_shader_program, "follow_camera"), 1);
-		glUniform1i(glGetUniformLocation(sprite_shader_program, "use_perspective"), 0);
-		sprite_draw(test_sprite, sprite_shader_program);
+		sprite_draw(fan_animation_sprite, sprite_shader_program);
 
 		/*
 		glUseProgram(font_shader_program);
@@ -381,13 +311,30 @@ int main() {
 		glyph_render_string("Five Nights at Freddy's", font_shader_program, font_vao, font_vbo, 128.0f, 128.0f, 2.3f, GLM_VEC3_ONE);
 		*/
 
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		glUseProgram(render_shader_program);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, render_texture);
+		glUniform1i(glGetUniformLocation(render_shader_program, "render_texture"), 0);
+		glBindVertexArray(render_vao);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
 
 	/* destroy everything */
-	texture_destroy(&test_texture);
+	glDeleteFramebuffers(1, &fbo);
+	texture_destroy(&fan_animation_textures[0]);
+	texture_destroy(&fan_animation_textures[1]);
+	texture_destroy(&fan_animation_textures[2]);
 	texture_destroy(&office_texture);
+	glDeleteShader(sprite_shader_program);
+	glDeleteShader(font_shader_program);
+	glDeleteShader(render_shader_program);
 
 	glfwTerminate();
 	return 0;
