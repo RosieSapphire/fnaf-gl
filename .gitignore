@@ -1,3 +1,4 @@
 compile_commands.json
 five_nights_at_freddys
 resources/textures/
+.cache/
