@@ -34,6 +34,10 @@
 #define DOOR_BUTTON_RIGHT_10_INDEX		6
 #define DOOR_BUTTON_RIGHT_11_INDEX		7
 
+#define OFFICE_NORMAL_INDEX				0
+#define OFFICE_LEFT_LIGHT_INDEX			1
+#define OFFICE_RIGHT_LIGHT_INDEX		2
+
 int main() {
 	ivec2 monitor_size;
 	GLFWwindow *window;
@@ -55,7 +59,7 @@ int main() {
 	uint32_t render_shader_program;
 
 	sprite_t office_sprite;
-	uint32_t office_texture;
+	uint32_t office_textures[3];
 
 	sprite_t fan_animation_sprite;
 	uint32_t fan_animation_textures[3];
@@ -128,8 +132,10 @@ int main() {
 	sprite_shader_program = shader_create("resources/shaders/sprite_vertex.glsl", "resources/shaders/sprite_fragment.glsl");
 
 	/* set up sprites */
-	office_texture = texture_create("resources/textures/office/states/normal.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
-	sprite_create(&office_sprite, office_texture, (vec2){1600.0f, 720.0f});
+	office_textures[OFFICE_NORMAL_INDEX]		= texture_create("resources/textures/office/states/normal.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+	office_textures[OFFICE_LEFT_LIGHT_INDEX]	= texture_create("resources/textures/office/states/left.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+	office_textures[OFFICE_RIGHT_LIGHT_INDEX]	= texture_create("resources/textures/office/states/right.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+	sprite_create(&office_sprite, office_textures[0], (vec2){1600.0f, 720.0f});
 
 	fan_animation_textures[0] = texture_create("resources/textures/office/fan/00.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
 	fan_animation_textures[1] = texture_create("resources/textures/office/fan/01.png", GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
@@ -313,20 +319,24 @@ int main() {
 
 		/* check for clicking door buttons */
 		if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS && !mouse_has_clicked) {
-			int32_t mouse_offset = (int32_t)office_look_current;
-			uint8_t door_button_flags_old = door_button_flags;
-			door_button_flags ^= DOOR_BUTTON_LEFT_DOOR_FLAG *	mouse_inside_box(window, (ivec4){27		+ mouse_offset, 89		+ mouse_offset, 251, 371});
-			door_button_flags ^= DOOR_BUTTON_LEFT_LIGHT_FLAG *	mouse_inside_box(window, (ivec4){25 	+ mouse_offset, 87 	 	+ mouse_offset, 393, 513});
-			door_button_flags ^= DOOR_BUTTON_RIGHT_DOOR_FLAG * 	mouse_inside_box(window, (ivec4){1519	+ mouse_offset, 1581 	+ mouse_offset, 267, 387});
-			door_button_flags ^= DOOR_BUTTON_RIGHT_LIGHT_FLAG * mouse_inside_box(window, (ivec4){1519	+ mouse_offset, 1581	+ mouse_offset, 398, 518});
+			const int32_t mouse_offset = (int32_t)office_look_current;
+			const uint8_t door_button_flags_old = door_button_flags;
+			door_button_flags ^= DOOR_BUTTON_LEFT_DOOR_FLAG *	mouse_inside_box(window, (ivec4){  27,   89, 251, 371}, mouse_offset);
+			door_button_flags ^= DOOR_BUTTON_LEFT_LIGHT_FLAG *	mouse_inside_box(window, (ivec4){  25,   87, 393, 513}, mouse_offset);
+			door_button_flags ^= DOOR_BUTTON_RIGHT_DOOR_FLAG * 	mouse_inside_box(window, (ivec4){1519, 1581, 267, 387}, mouse_offset);
+			door_button_flags ^= DOOR_BUTTON_RIGHT_LIGHT_FLAG * mouse_inside_box(window, (ivec4){1519, 1581, 398, 518}, mouse_offset);
 
 			/* handle cases where both lights are toggled */
-			if((door_button_flags & DOOR_BUTTON_LEFT_LIGHT_FLAG) && (door_button_flags_old & DOOR_BUTTON_RIGHT_LIGHT_FLAG)) {
-				door_button_flags &= ~DOOR_BUTTON_RIGHT_LIGHT_FLAG;
+			if(door_button_flags & DOOR_BUTTON_LEFT_LIGHT_FLAG) {
+				if(door_button_flags_old & DOOR_BUTTON_RIGHT_LIGHT_FLAG) {
+					door_button_flags &= ~DOOR_BUTTON_RIGHT_LIGHT_FLAG;
+				}
 			}
 
-			if((door_button_flags & DOOR_BUTTON_RIGHT_LIGHT_FLAG) && (door_button_flags_old & DOOR_BUTTON_LEFT_LIGHT_FLAG)) {
-				door_button_flags &= ~DOOR_BUTTON_LEFT_LIGHT_FLAG;
+			if(door_button_flags & DOOR_BUTTON_RIGHT_LIGHT_FLAG) {
+				if(door_button_flags_old & DOOR_BUTTON_LEFT_LIGHT_FLAG) {
+					door_button_flags &= ~DOOR_BUTTON_LEFT_LIGHT_FLAG;
+				}
 			}
 
 			/* update button textures */
@@ -358,6 +368,21 @@ int main() {
 				}
 			}
 
+			/* update office textures */
+			office_sprite.texture = office_textures[OFFICE_NORMAL_INDEX];
+			if(door_button_flags & DOOR_BUTTON_LEFT_LIGHT_FLAG) {
+				office_sprite.texture = office_textures[OFFICE_LEFT_LIGHT_INDEX];
+			}
+
+			if(door_button_flags & DOOR_BUTTON_RIGHT_LIGHT_FLAG) {
+				office_sprite.texture = office_textures[OFFICE_RIGHT_LIGHT_INDEX];
+			}
+
+			printf("Door Flags: %d", (door_button_flags & DOOR_BUTTON_RIGHT_LIGHT_FLAG) > 0);
+			printf("%d", (door_button_flags & DOOR_BUTTON_RIGHT_DOOR_FLAG) > 0);
+			printf("%d", (door_button_flags & DOOR_BUTTON_LEFT_LIGHT_FLAG) > 0);
+			printf("%d\n", (door_button_flags & DOOR_BUTTON_LEFT_DOOR_FLAG) > 0);
+
 			mouse_has_clicked = 1;
 		}
 
@@ -366,10 +391,6 @@ int main() {
 		}
 
 		/* update */
-		printf("Door Flags: %d", (door_button_flags & DOOR_BUTTON_RIGHT_LIGHT_FLAG) > 0);
-		printf("%d", (door_button_flags & DOOR_BUTTON_RIGHT_DOOR_FLAG) > 0);
-		printf("%d", (door_button_flags & DOOR_BUTTON_LEFT_LIGHT_FLAG) > 0);
-		printf("%d\n", (door_button_flags & DOOR_BUTTON_LEFT_DOOR_FLAG) > 0);
 
 		animation_timer += time_delta;
 		if(animation_timer > ANIMATION_FRAMETIME) {
@@ -429,7 +450,9 @@ int main() {
 	texture_destroy(&fan_animation_textures[0]);
 	texture_destroy(&fan_animation_textures[1]);
 	texture_destroy(&fan_animation_textures[2]);
-	texture_destroy(&office_texture);
+	texture_destroy(&office_textures[0]);
+	texture_destroy(&office_textures[1]);
+	texture_destroy(&office_textures[2]);
 	glDeleteShader(sprite_shader_program);
 	glDeleteShader(font_shader_program);
 	glDeleteShader(render_shader_program);

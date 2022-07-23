@@ -5,6 +5,6 @@
 #include <cglm/cglm.h>
 
 void mouse_get_position(GLFWwindow *window, ivec2 output);
-uint8_t mouse_inside_box(GLFWwindow *window, ivec4 box);
+uint8_t mouse_inside_box(GLFWwindow *window, ivec4 box, const float offset);
 
 #endif
