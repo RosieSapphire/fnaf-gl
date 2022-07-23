@@ -45,16 +45,15 @@ int main() {
 	ivec2 mouse_position;
 	uint8_t mouse_has_clicked = 0;
 
+	float animation_timer = 0.0f;
+
 	uint32_t fbo;
 	uint32_t rbo;
 	uint32_t render_vao;
 	uint32_t render_vbo;
 
 	double time_now, time_last;
-	float animation_timer = 0.0f;
 
-	uint8_t render_wireframe = 0;
-	uint8_t render_wireframe_pressed = 0;
 	uint32_t render_texture;
 	uint32_t render_shader_program;
 
@@ -64,7 +63,7 @@ int main() {
 
 	sprite_t fan_animation_sprite;
 	uint32_t fan_animation_textures[3];
-	uint32_t fan_animation_frame = 0;
+	float fan_animation_frame = 0.0f;
 
 	sprite_t door_button_sprite_left;
 	sprite_t door_button_sprite_right;
@@ -74,8 +73,8 @@ int main() {
 	sprite_t door_sprite_left;
 	sprite_t door_sprite_right;
 	uint32_t door_textures[15];
-	uint8_t door_frame_left = 0;
-	uint8_t door_frame_right = 0;
+	float door_frame_left = 0.0f;
+	float door_frame_right = 0.0f;
 
 	uint32_t sprite_shader_program;
 
@@ -84,6 +83,7 @@ int main() {
 	uint32_t font_shader_program;
 
 	float office_look_current = 0.0f;
+	uint8_t office_look_use_alternate = 0;
 
 	mat4 matrix_projection;
 	mat4 matrix_view;
@@ -309,17 +309,9 @@ int main() {
 			glfwSetWindowShouldClose(window, 1);
 		}
 
-		if(glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
-			if(!render_wireframe_pressed) {
-				render_wireframe = !render_wireframe;
-				render_wireframe_pressed = 1;
-			}
-		} else {
-			render_wireframe_pressed = 0;
-		}
-
+		/* use the appropriate room scroll setting */
 		mouse_get_position(window, mouse_position);
-		{ /* use mouse to look around office */
+		if(!office_look_use_alternate) {
 			float mouse_distance_from_center;
 			mouse_distance_from_center = mouse_position[0] - (WINDOW_WIDTH / 2.0f);
 
@@ -342,6 +334,20 @@ int main() {
 			if(office_look_current < -320.0f) {
 				office_look_current = -320.0f;
 			}
+		} else {
+			float office_look_target;
+			float mouse_normalized_x = (float)mouse_position[0] / (float)WINDOW_WIDTH;
+			if(mouse_normalized_x > 1.0f) {
+				mouse_normalized_x = 1.0f;
+			}
+
+			if(mouse_normalized_x < 0.0f) {
+				mouse_normalized_x = 0.0f;
+			}
+
+			office_look_target = mouse_normalized_x * -320;
+			office_look_current += (office_look_target - office_look_current) * time_delta * 8.0f;
+			printf("%f\n", office_look_current);
 		}
 
 		/* check for clicking door buttons */
@@ -349,10 +355,10 @@ int main() {
 			const int32_t mouse_offset = (int32_t)office_look_current;
 			const uint8_t door_button_flags_old = door_button_flags;
 
-			if(!door_frame_left || door_frame_left == 28)
+			if(!((uint8_t)door_frame_left) || (uint8_t)door_frame_left == 28)
 				door_button_flags ^= DOOR_BUTTON_LEFT_DOOR_FLAG *	mouse_inside_box(window, (ivec4){  27,   89, 251, 371}, mouse_offset);
 
-			if(!door_frame_right || door_frame_right == 28)
+			if(!((uint8_t)door_frame_right) || (uint8_t)door_frame_right == 28)
 				door_button_flags ^= DOOR_BUTTON_RIGHT_DOOR_FLAG * 	mouse_inside_box(window, (ivec4){1519, 1581, 267, 387}, mouse_offset);
 
 			door_button_flags ^= DOOR_BUTTON_LEFT_LIGHT_FLAG *	mouse_inside_box(window, (ivec4){  25,   87, 393, 513}, mouse_offset);
@@ -424,52 +430,72 @@ int main() {
 			mouse_has_clicked = 0;
 		}
 
-		/* update */
-		animation_timer += time_delta;
-		if(animation_timer > ANIMATION_FRAMETIME) {
-			animation_timer = 0.0f;
+		{ /* update */
+			float ticks = time_delta * 60.0f;
+			printf("%f\n", ticks);
 
-			fan_animation_frame++;
-			fan_animation_frame %= 3;
-			fan_animation_sprite.texture = fan_animation_textures[fan_animation_frame];
+			fan_animation_frame += ticks;
+			fan_animation_frame = fmodf(fan_animation_frame, 3);
+			fan_animation_sprite.texture = fan_animation_textures[(uint8_t)fan_animation_frame];
 
 			if(door_button_flags & DOOR_BUTTON_LEFT_DOOR_FLAG) {
-				door_frame_left++;
-				if(door_frame_left > 28) {
-					door_frame_left = 28;
+				door_frame_left += ticks;
+				if(door_frame_left > 28.0f) {
+					door_frame_left = 28.0f;
 				}
 			} else {
-				if(door_frame_left > 0) {
-					door_frame_left--;
+				door_frame_left -= ticks;
+				if(door_frame_left < 0.0f) {
+					door_frame_left = 0.0f;
 				}
 			}
-			door_sprite_left.texture = door_textures[door_frame_left / 2];
+			door_sprite_left.texture = door_textures[(uint8_t)(door_frame_left / 2)];
 
 			if(door_button_flags & DOOR_BUTTON_RIGHT_DOOR_FLAG) {
-				door_frame_right++;
-				if(door_frame_right > 28) {
-					door_frame_right = 28; 
+				door_frame_right += ticks;
+				if(door_frame_right > 28.0f) {
+					door_frame_right = 28.0f;
 				}
 			} else {
-				if(door_frame_right > 0) {
-					door_frame_right--;
+				door_frame_right -= ticks;
+				if(door_frame_right < 0.0f) {
+					door_frame_right = 0.0f;
 				}
 			}
-			door_sprite_right.texture = door_textures[door_frame_right / 2];
+			door_sprite_right.texture = door_textures[(uint8_t)(door_frame_right / 2)];
+
+			animation_timer += time_delta;
+			if(animation_timer > ANIMATION_FRAMETIME) {
+				uint8_t light_random = rand() % 10;
+				if(door_button_flags & DOOR_BUTTON_LEFT_LIGHT_FLAG) {
+					if(light_random) {
+						office_sprite.texture = office_textures[OFFICE_LEFT_LIGHT_INDEX];
+					} else {
+						office_sprite.texture = office_textures[OFFICE_NORMAL_INDEX];
+					}
+				}
+
+				if(door_button_flags & DOOR_BUTTON_RIGHT_LIGHT_FLAG) {
+					if(light_random) {
+						office_sprite.texture = office_textures[OFFICE_RIGHT_LIGHT_INDEX];
+					} else {
+						office_sprite.texture = office_textures[OFFICE_NORMAL_INDEX];
+					}
+				}
+
+				animation_timer = 0.0f;
+			}
 		}
 
 		glm_mat4_copy(GLM_MAT4_IDENTITY, matrix_view);
 		glm_translate(matrix_view, (vec3){office_look_current, 0.0f, 0.0f});
 
 		/* draw */
+		for(int i = 0; i < 1; i++) {
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
-		if(render_wireframe) {
-			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		} else {
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		}
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 		/* draw office */
 		glUseProgram(sprite_shader_program);
@@ -505,6 +531,7 @@ int main() {
 		glUniform1i(glGetUniformLocation(render_shader_program, "render_texture"), 0);
 		glBindVertexArray(render_vao);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
+		}
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
