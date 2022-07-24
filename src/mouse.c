@@ -7,7 +7,7 @@ void mouse_get_position(GLFWwindow *window, ivec2 output) {
 	output[1] = (int32_t)y;
 }
 
-uint8_t mouse_inside_box(GLFWwindow *window, ivec4 box, const float offset) {
+uint8_t mouse_inside_box(GLFWwindow *window, const ivec4 box, const float offset) {
 	ivec2 mouse_position;
 	mouse_get_position(window, mouse_position);
 	return

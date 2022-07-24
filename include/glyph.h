@@ -10,7 +10,7 @@ typedef struct {
 	uint32_t advance;
 } glyph_t;
 
-glyph_t glyphs[128];
+static glyph_t glyphs[128];
 
 void glyph_render_string(const char *string, const uint32_t shader_program, const uint32_t vao, const uint32_t vbo, float x, float y, const float scale, const vec3 color);
 
