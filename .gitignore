@@ -1,6 +1,7 @@
 compile_commands.json
 five_nights_at_freddys
-resources/textures/
+resources/graphics
+resources/audio
 .cache/
 *.mfa
 *.001

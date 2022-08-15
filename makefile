@@ -1,11 +1,11 @@
 CC=gcc
 INC=-I./include/ -I/usr/include -I/usr/local/include/
-LIB=-lglfw -lGL -lX11 -lpthread -lXrandr -ldl -lcglm -lfreetype -lm
+LIB=-lglfw -lGL -lX11 -lpthread -lXrandr -ldl -lcglm -lfreetype -lalut -lopenal -lsndfile -lm
 
 CFLAGS=-std=c99
 
-SRC=main.c glad.c file.c glyph.c texture.c sprite.c shader.c mouse.c
-OBJ=main.o glad.o file.o glyph.o texture.o sprite.o shader.o mouse.o
+SRC=main.c glad.c file.c glyph.c texture.c sprite.c shader.c mouse.c sound.c
+OBJ=main.o glad.o file.o glyph.o texture.o sprite.o shader.o mouse.o sound.o
 
 BIN=five_nights_at_freddys
 
