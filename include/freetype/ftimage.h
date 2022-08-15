@@ -1,3 +1,6 @@
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+
 /****************************************************************************
  *
  * ftimage.h
@@ -1276,3 +1279,5 @@ FT_END_HEADER
 /* Local Variables: */
 /* coding: utf-8    */
 /* End:             */
+
+#pragma clang diagnostic pop

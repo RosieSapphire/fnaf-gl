@@ -1,4 +1,4 @@
-CC=gcc
+CC=clang
 INC=-I./include/ -I/usr/include -I/usr/local/include/
 LIB=-lglfw -lGL -lX11 -lpthread -lXrandr -ldl -lcglm -lfreetype -lalut -lopenal -lsndfile -lm
 
@@ -12,10 +12,10 @@ BIN=five_nights_at_freddys
 all: release
 
 release: $(BIN)
-release: CFLAGS += -O2
+release: CFLAGS += -O2 -Wall -Wextra -Weverything
 
 debug: $(BIN)
-debug: CFLAGS += -Og -g3 -Wall -Wextra -Werror
+debug: CFLAGS += -Og -g3 -Wall -Wextra -Weverything -Werror
 
 run: release
 	clear
@@ -40,6 +40,14 @@ $(BIN): $(OBJ)
 clean:
 	rm -rf $(BIN) *.o src/*.orig include/*.orig
 	clear
+
+cleanrun:
+	make clean
+	make run -j8
+
+cleandebug:
+	make clean
+	make gdb -j8
 
 format:
 	astyle -A3 -s -f -xg -k3 -xj -v src/*.c

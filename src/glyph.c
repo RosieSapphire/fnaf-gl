@@ -11,10 +11,10 @@ void glyph_render_string(const char *string, const uint32_t shader_program, cons
 
 	for(const char *i = string; *i != 0; i++) {
 		glyph_t cur_glyph = glyphs[*((const uint8_t *)i)];
-		float cur_x = x + cur_glyph.bearing[0] * scale;
-		float cur_y = y - ((cur_glyph.size[1] - cur_glyph.bearing[1]) * scale);
-		float w = cur_glyph.size[0] * scale;
-		float h = cur_glyph.size[1] * scale;
+		float cur_x = x + (float)cur_glyph.bearing[0] * scale;
+		float cur_y = y - ((float)(cur_glyph.size[1] - cur_glyph.bearing[1]) * scale);
+		float w = (float)cur_glyph.size[0] * scale;
+		float h = (float)cur_glyph.size[1] * scale;
 
 		float font_vertices[6][4] = {
 			{cur_x,		cur_y + h,	0.0f, 0.0f},
@@ -32,7 +32,7 @@ void glyph_render_string(const char *string, const uint32_t shader_program, cons
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
-		x += (cur_glyph.advance >> 6) * scale;
+		x += (float)(cur_glyph.advance >> 6) * scale;
 	}
 
 	glBindVertexArray(0);

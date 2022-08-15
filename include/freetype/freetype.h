@@ -1,3 +1,6 @@
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+
 /****************************************************************************
  *
  * freetype.h
@@ -5048,3 +5051,5 @@ FT_END_HEADER
 
 
 /* END */
+
+#pragma clang diagnostic pop

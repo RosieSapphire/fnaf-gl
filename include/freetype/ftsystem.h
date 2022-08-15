@@ -1,3 +1,6 @@
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+
 /****************************************************************************
  *
  * ftsystem.h
@@ -356,3 +359,5 @@ FT_END_HEADER
 
 
 /* END */
+
+#pragma clang diagnostic pop

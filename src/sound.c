@@ -12,13 +12,13 @@ uint32_t sound_buffer_create(const char *path) {
 
 	SNDFILE *file;
 	SF_INFO file_info;
-	sf_count_t frame_count;
-	uint32_t error;
-	uint32_t format;
+	uint64_t frame_count;
+	int32_t error;
+	int32_t format;
 	int16_t *memory_buffer;
-	uint32_t size;
+	uint64_t size;
 
-	uint32_t formats[4] = {
+	int32_t formats[4] = {
 		AL_FORMAT_MONO16,
 		AL_FORMAT_STEREO16,
 		AL_FORMAT_BFORMAT2D_16,
@@ -45,8 +45,8 @@ uint32_t sound_buffer_create(const char *path) {
 		return 0;
 	}
 
-	memory_buffer = malloc((size_t)(file_info.frames * file_info.channels) * sizeof(int16_t));
-	frame_count = sf_readf_short(file, memory_buffer, file_info.frames);
+	memory_buffer = malloc((uint64_t)(file_info.frames * file_info.channels) * sizeof(int16_t));
+	frame_count = (uint64_t)sf_readf_short(file, memory_buffer, file_info.frames);
 	if(frame_count < 1) {
 		free(memory_buffer);
 		sf_close(file);
@@ -54,11 +54,11 @@ uint32_t sound_buffer_create(const char *path) {
 		return 0;
 	}
 
-	size = (size_t)(frame_count * file_info.channels) * (size_t)sizeof(int16_t);
+	size = frame_count * (uint64_t)file_info.channels * sizeof(int16_t);
 
 	sound_buffer = 0;
 	alGenBuffers(1, &sound_buffer);
-	alBufferData(sound_buffer, format, (void *)memory_buffer, size, file_info.samplerate);
+	alBufferData(sound_buffer, format, (void *)memory_buffer, (int32_t)size, file_info.samplerate);
 	error = alGetError();
 
 	free(memory_buffer);
@@ -75,7 +75,7 @@ uint32_t sound_buffer_create(const char *path) {
 	return sound_buffer;
 }
 
-uint32_t sound_source_create(uint32_t sound_buffer, const float pitch, const float gain, const float *position, const uint8_t loop) {
+uint32_t sound_source_create(int32_t sound_buffer, const float pitch, const float gain, const float *position, const uint8_t loop) {
 	uint32_t sound_source;
 	alGenSources(1, &sound_source); alSourcef(sound_source, AL_PITCH, pitch);
 	alSourcef(sound_source, AL_GAIN, gain);

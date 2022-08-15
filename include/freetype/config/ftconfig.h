@@ -1,3 +1,6 @@
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+
 /****************************************************************************
  *
  * ftconfig.h
@@ -49,3 +52,5 @@
 
 
 /* END */
+
+#pragma clang diagnostic pop

@@ -8,8 +8,10 @@ typedef struct {
 	uint32_t vao;
 	uint32_t vbo;
 	uint32_t texture;
+	uint32_t padding;
 	mat4 matrix;
 	vec2 size;
+	uint64_t padding2;
 } sprite_t;
 
 void sprite_create(sprite_t *sprite, uint32_t texture, vec2 size);
