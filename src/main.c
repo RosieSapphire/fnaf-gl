@@ -57,8 +57,13 @@ static float door_frame_timers[2] = {0.0f};
 static uint32_t sprite_shader_program;
 static uint8_t office_sprite_state = 0;
 
-static sprite_t power_meter_sprite;
-static float power_meter_value = 0.0f;
+static sprite_t power_usage_sprite;
+static uint8_t power_usage_value;
+static sprite_t power_left_sprite;
+static sprite_t power_left_percent_sprite;
+static float power_left_value = 100.0f;
+
+static sprite_t power_usage_text_sprite;
 
 /* sound sources and buffers */
 static uint32_t fan_sound_source;
@@ -144,13 +149,20 @@ int main() {
 	sprite_shader_program = shader_create("resources/shaders/sprite_vertex.glsl", "resources/shaders/sprite_fragment.glsl");
 
 	{ /* load sprites */
+		const char *office_paths;
+
+		const char *fan_animation_paths;
+
 		const vec2 door_positions[2] = {{72.0f, -1.0f}, {1270.0f, -2.0f}};
 		const vec2 door_button_positions[2] = {{6.0f, 263.0f}, {1497.0f, 273.0f}};
-		const char *office_paths;
-		const char *fan_animation_paths;
 		const char *door_button_paths;
 		const char *door_animation_paths;
-		const char *power_meter_paths;
+
+		const char *power_usage_paths;
+		const char *power_usage_text_path = "resources/graphics/office/ui/power/usage.png";
+		const char *power_left_path = "resources/graphics/office/ui/power/power-left-0.png";
+		const char *power_left_percent_path = "resources/graphics/office/ui/power/power-left-1.png";
+		const char *power_left_number_paths;
 
 		office_paths = calloc(5 * 39, sizeof(char));
 		for(uint8_t i = 0; i < 5; i++) {
@@ -188,13 +200,21 @@ int main() {
 		}
 		free(door_animation_paths);
 
-		power_meter_paths = calloc(4 * 49, sizeof(char));
+		power_usage_paths = calloc(4 * 49, sizeof(char));
 		for(uint8_t i = 0; i < 4; i++) {
-			sprintf(power_meter_paths + (i * 49), "resources/graphics/office/ui/power/levels/0%u.png", i);
+			sprintf(power_usage_paths + (i * 49), "resources/graphics/office/ui/power/levels/0%u.png", i);
 		}
-		sprite_create(&power_meter_sprite, (vec2){103, 32}, power_meter_paths, 4);
-		sprite_set_position(&power_meter_sprite, (vec2){120, 657});
-		free(power_meter_paths);
+		sprite_create(&power_usage_sprite, (vec2){103, 32}, power_usage_paths, 4);
+		sprite_set_position(&power_usage_sprite, (vec2){120, 657});
+		free(power_usage_paths);
+
+		sprite_create(&power_usage_text_sprite, (vec2){72, 14}, power_usage_text_path, 1);
+		sprite_set_position(&power_usage_text_sprite, (vec2){38, 667});
+
+		sprite_create(&power_left_sprite, (vec2){137, 14}, power_left_path, 1);
+		sprite_set_position(&power_left_sprite, (vec2){38, 631});
+		sprite_create(&power_left_percent_sprite, (vec2){11, 14}, power_left_percent_path, 1);
+		sprite_set_position(&power_left_percent_sprite, (vec2){228, 632});
 	}
 
 	{ /* set up audio engine */
@@ -452,6 +472,12 @@ int main() {
 			mouse_has_clicked = 1;
 		}
 
+		/* power usage */
+		power_usage_value = 0;
+		for(uint8_t i = 0; i < 2; i++) {
+			power_usage_value += ((door_button_flags >> (i * 2)) & 0x1) + ((((door_button_flags >> (i * 2)) & 0x2) > 0));
+		}
+
 		if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_RELEASE) {
 			mouse_has_clicked = 0;
 		}
@@ -529,7 +555,11 @@ int main() {
 		glUseProgram(render_ui_shader_program);
 		glUniformMatrix4fv(glGetUniformLocation(render_ui_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
 
-		sprite_draw(power_meter_sprite, render_ui_shader_program, (uint32_t)power_meter_value);
+		sprite_draw(power_usage_text_sprite, render_ui_shader_program, 0);
+		sprite_draw(power_usage_sprite, render_ui_shader_program, power_usage_value);
+
+		sprite_draw(power_left_sprite, render_ui_shader_program, 0);
+		sprite_draw(power_left_percent_sprite, render_ui_shader_program, 0);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
