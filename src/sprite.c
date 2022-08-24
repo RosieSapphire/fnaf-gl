@@ -33,7 +33,7 @@ void sprite_create(sprite_t *sprite, vec2 size, char *texture_paths, const uint1
 	while(*c) { c++; }
 	texture_path_length = (uint8_t)(c - texture_paths);
 	for(uint16_t i = 0; i < texture_count; i++) {
-		sprite->textures[i] = texture_create(texture_paths + (i * (texture_path_length + 1)), GL_CLAMP_TO_EDGE, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, 1);
+		sprite->textures[i] = texture_create(texture_paths + (i * (texture_path_length + 1)), GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR, 0);
 	}
 
 	glm_mat4_copy(GLM_MAT4_IDENTITY, sprite->matrix);

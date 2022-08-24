@@ -9,7 +9,6 @@
 #include <AL/alc.h>
 
 #include "file.h"
-#include "glyph.h"
 #include "texture.h"
 #include "sprite.h"
 #include "shader.h"
@@ -41,6 +40,7 @@ static double time_now, time_last;
 
 static uint32_t render_texture;
 static uint32_t render_shader_program;
+static uint32_t render_ui_shader_program;
 
 /* sprites and textures */
 static sprite_t office_sprite;
@@ -56,6 +56,9 @@ static float door_frame_timers[2] = {0.0f};
 
 static uint32_t sprite_shader_program;
 static uint8_t office_sprite_state = 0;
+
+static sprite_t power_meter_sprite;
+static float power_meter_value = 0.0f;
 
 /* sound sources and buffers */
 static uint32_t fan_sound_source;
@@ -78,7 +81,6 @@ static uint8_t office_look_use_alternate_pressed = 0;
 
 static mat4 matrix_projection;
 static mat4 matrix_view;
-static mat4 matrix_office;
 
 float clampf(const float x, const float min, const float max) {
     float diff[2] = {min-x, x-max};
@@ -134,10 +136,10 @@ int main() {
 	/* set up matricies */
 	glm_ortho(0.0f, WINDOW_WIDTH, 0.0f, WINDOW_HEIGHT, -1.0f, 1.0f, matrix_projection);
 	glm_mat4_copy(GLM_MAT4_IDENTITY, matrix_view);
-	glm_mat4_copy(GLM_MAT4_IDENTITY, matrix_office);
 
 	/* create shaders */
 	render_shader_program = shader_create("resources/shaders/render_vertex.glsl", "resources/shaders/render_fragment.glsl");
+	render_ui_shader_program = shader_create("resources/shaders/render_ui_vertex.glsl", "resources/shaders/render_ui_fragment.glsl");
 	font_shader_program = shader_create("resources/shaders/font_vertex.glsl", "resources/shaders/font_fragment.glsl");
 	sprite_shader_program = shader_create("resources/shaders/sprite_vertex.glsl", "resources/shaders/sprite_fragment.glsl");
 
@@ -148,6 +150,7 @@ int main() {
 		const char *fan_animation_paths;
 		const char *door_button_paths;
 		const char *door_animation_paths;
+		const char *power_meter_paths;
 
 		office_paths = calloc(5 * 39, sizeof(char));
 		for(uint8_t i = 0; i < 5; i++) {
@@ -184,6 +187,14 @@ int main() {
 			sprite_set_position(&door_animation_sprites[i], door_positions[i]);
 		}
 		free(door_animation_paths);
+
+		power_meter_paths = calloc(4 * 49, sizeof(char));
+		for(uint8_t i = 0; i < 4; i++) {
+			sprintf(power_meter_paths + (i * 49), "resources/graphics/office/ui/power/levels/0%u.png", i);
+		}
+		sprite_create(&power_meter_sprite, (vec2){103, 32}, power_meter_paths, 4);
+		sprite_set_position(&power_meter_sprite, (vec2){120, 657});
+		free(power_meter_paths);
 	}
 
 	{ /* set up audio engine */
@@ -235,7 +246,8 @@ int main() {
 	/* set up audio listener */
 	alListeneri(AL_DISTANCE_MODEL, AL_INVERSE_DISTANCE_CLAMPED);
 
-	{ /* load freetype */
+	/*
+	{
 		FT_Library freetype;
 		FT_Face freetype_face;
 		if(FT_Init_FreeType(&freetype)) {
@@ -275,6 +287,7 @@ int main() {
 		FT_Done_Face(freetype_face);
 		FT_Done_FreeType(freetype);
 	}
+	*/
 
 	/* generate freetype buffers */
 	glGenVertexArrays(1, &font_vao);
@@ -479,7 +492,6 @@ int main() {
 		glm_translate(matrix_view, (vec3){office_look_current, 0.0f, 0.0f});
 
 		/* draw */
-		for(int i = 0; i < 1; i++) {
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -490,7 +502,6 @@ int main() {
 		glUniformMatrix4fv(glGetUniformLocation(sprite_shader_program, "view"), 1, GL_FALSE, (const GLfloat *)matrix_view);
 		glUniformMatrix4fv(glGetUniformLocation(sprite_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
 
-		glUniform1i(glGetUniformLocation(sprite_shader_program, "follow_camera"), 0);
 		sprite_draw(office_sprite, sprite_shader_program, office_sprite_state);
 		sprite_draw(fan_animation_sprite, sprite_shader_program, (uint8_t)fan_animation_frame);
 
@@ -503,12 +514,6 @@ int main() {
 			sprite_draw(door_button_sprites[i], sprite_shader_program, (door_button_flags >> (2 * i)) & 0b11);
 		}
 
-		/*
-		glUseProgram(font_shader_program);
-		glUniformMatrix4fv(glGetUniformLocation(font_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
-		glyph_render_string("Five Nights at Freddy's", font_shader_program, font_vao, font_vbo, 128.0f, 128.0f, 2.3f, GLM_VEC3_ONE);
-		*/
-
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -519,7 +524,12 @@ int main() {
 		glUniform1i(glGetUniformLocation(render_shader_program, "render_texture"), 0);
 		glBindVertexArray(render_vao);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
-		}
+
+		/* ui elements */
+		glUseProgram(render_ui_shader_program);
+		glUniformMatrix4fv(glGetUniformLocation(render_ui_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
+
+		sprite_draw(power_meter_sprite, render_ui_shader_program, (uint32_t)power_meter_value);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -537,6 +547,7 @@ int main() {
 
 	glDeleteShader(sprite_shader_program);
 	glDeleteShader(font_shader_program);
+	glDeleteShader(render_ui_shader_program);
 	glDeleteShader(render_shader_program);
 
 	alDeleteSources(4, &fan_sound_source);
