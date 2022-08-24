@@ -4,7 +4,7 @@
 #include <stb_image.h>
 #include <glad/glad.h>
 
-uint32_t texture_create(const char *path, const int32_t wrap_mode, const int32_t min_interpolation, const int32_t mag_interpolation) {
+texture_t texture_create(const char *path, const int32_t wrap_mode, const int32_t min_interpolation, const int32_t mag_interpolation, const uint8_t mipmap) {
 	int32_t texture_width, texture_height, texture_format;
 	uint8_t *texture_data;
 	uint32_t texture;
@@ -27,15 +27,17 @@ uint32_t texture_create(const char *path, const int32_t wrap_mode, const int32_t
 	texture_data = stbi_load(path, &texture_width, &texture_height, &texture_format, 0);
 	if(!texture_data) {
 		printf("ERROR: Texture at: %s fucked up.\n", path);
-		return 1;
+		return 255;
 	}
 
 	glTexImage2D(GL_TEXTURE_2D, 0, texture_format_enums[texture_format], texture_width, texture_height, 0, (uint32_t)texture_format_enums[texture_format], GL_UNSIGNED_BYTE, texture_data);
 	stbi_image_free(texture_data);
 
-	return texture;
-}
+	if(mipmap) {
+		glGenerateMipmap(GL_TEXTURE_2D);
+	}
 
-void texture_destroy(uint32_t *texture) {
-	glDeleteTextures(1, texture);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	return texture;
 }

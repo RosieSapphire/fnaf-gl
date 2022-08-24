@@ -25,8 +25,60 @@
 
 #define ANIMATION_FRAMETIME				0.01666667f
 
-#define DOOR_BUTTON_LIGHT_FLAG			0b0001
-#define DOOR_BUTTON_DOOR_FLAG			0b0010
+#define DOOR_BUTTON_LIGHT_FLAG			0x1
+#define DOOR_BUTTON_DOOR_FLAG			0x2
+
+static GLFWwindow *window;
+static uint8_t mouse_has_clicked = 0;
+
+static float animation_timer = 0.0f;
+
+static uint32_t fbo;
+static uint32_t rbo;
+static uint32_t render_vao;
+
+static double time_now, time_last;
+
+static uint32_t render_texture;
+static uint32_t render_shader_program;
+
+/* sprites and textures */
+static sprite_t office_sprite;
+
+static sprite_t fan_animation_sprite;
+static float fan_animation_frame = 0.0f;
+
+static sprite_t door_button_sprites[2];
+static uint8_t door_button_flags = 0;
+
+static sprite_t door_animation_sprites[2];
+static float door_frame_timers[2] = {0.0f};
+
+static uint32_t sprite_shader_program;
+static uint8_t office_sprite_state = 0;
+
+/* sound sources and buffers */
+static uint32_t fan_sound_source;
+static uint32_t light_sound_source;
+static uint32_t door_sound_source;
+static uint32_t freddy_nose_sound_source;
+
+static uint32_t fan_sound_buffer;
+static uint32_t light_sound_buffer;
+static uint32_t door_sound_buffer;
+static uint32_t freddy_nose_sound_buffer;
+
+static uint32_t font_vao;
+static uint32_t font_vbo;
+static uint32_t font_shader_program;
+
+static float office_look_current = 0.0f;
+static uint8_t office_look_use_alternate = 0;
+static uint8_t office_look_use_alternate_pressed = 0;
+
+static mat4 matrix_projection;
+static mat4 matrix_view;
+static mat4 matrix_office;
 
 float clampf(const float x, const float min, const float max) {
     float diff[2] = {min-x, x-max};
@@ -39,68 +91,6 @@ float clampf(const float x, const float min, const float max) {
 }
 
 int main() {
-	GLFWwindow *window;
-	ivec2 monitor_size;
-	ivec2 mouse_position;
-	uint8_t mouse_has_clicked = 0;
-
-	const char *sound_device_name;
-	ALCdevice *sound_device;
-	ALCcontext *sound_context;
-
-	float animation_timer = 0.0f;
-
-	uint32_t fbo;
-	uint32_t rbo;
-	uint32_t render_vao;
-	uint32_t render_vbo;
-
-	double time_now, time_last;
-
-	uint32_t render_texture;
-	uint32_t render_shader_program;
-
-	/* sprites and textures */
-	sprite_t office_sprite;
-	uint32_t office_textures[3];
-
-	sprite_t fan_animation_sprite;
-	uint32_t fan_animation_textures[3];
-	float fan_animation_frame = 0.0f;
-
-	sprite_t door_button_sprites[2];
-	uint32_t door_button_textures[8];
-	uint8_t door_button_flags = 0;
-
-	sprite_t door_sprites[2];
-	uint32_t door_animation_textures[15];
-	float door_frame_timers[2] = {0.0f};
-
-	uint32_t sprite_shader_program;
-
-	/* sound sources and buffers */
-	uint32_t fan_sound_source;
-	uint32_t light_sound_source;
-	uint32_t door_sound_source;
-	uint32_t freddy_nose_sound_source;
-
-	uint32_t fan_sound_buffer;
-	uint32_t light_sound_buffer;
-	uint32_t door_sound_buffer;
-	uint32_t freddy_nose_sound_buffer;
-
-	uint32_t font_vao;
-	uint32_t font_vbo;
-	uint32_t font_shader_program;
-
-	float office_look_current = 0.0f;
-	uint8_t office_look_use_alternate = 0;
-	uint8_t office_look_use_alternate_pressed = 0;
-
-	mat4 matrix_projection;
-	mat4 matrix_view;
-	mat4 matrix_office;
-
 	/* load GLFW */
 	if(!glfwInit()) {
 		printf("ERROR: GLFW fucked up.\n");
@@ -120,6 +110,7 @@ int main() {
 
 	{ /* get monitor properties */
 		GLFWmonitor *monitor;
+		ivec2 monitor_size;
 		int32_t monitor_count;
 		monitor = *glfwGetMonitors(&monitor_count);
 		if(!monitor) {
@@ -150,83 +141,84 @@ int main() {
 	font_shader_program = shader_create("resources/shaders/font_vertex.glsl", "resources/shaders/font_fragment.glsl");
 	sprite_shader_program = shader_create("resources/shaders/sprite_vertex.glsl", "resources/shaders/sprite_fragment.glsl");
 
-	/* set up sprites */
-	{
-		const char *office_texture_paths[3] = {
-			"resources/graphics/office/states/normal.png",
-			"resources/graphics/office/states/left.png",
-			"resources/graphics/office/states/right.png",
-		};
+	{ /* load sprites */
+		const vec2 door_positions[2] = {{72.0f, -1.0f}, {1270.0f, -2.0f}};
+		const vec2 door_button_positions[2] = {{6.0f, 263.0f}, {1497.0f, 273.0f}};
+		const char *office_paths;
+		const char *fan_animation_paths;
+		const char *door_button_paths;
+		const char *door_animation_paths;
 
-		for(uint8_t i = 0; i < 3; i++) {
-			office_textures[i] = texture_create(office_texture_paths[i], GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+		office_paths = calloc(5 * 39, sizeof(char));
+		for(uint8_t i = 0; i < 5; i++) {
+			sprintf(office_paths + (i * 39), "resources/graphics/office/states/%u.png", i);
 		}
-		sprite_create(&office_sprite, office_textures[0], (vec2){1600.0f, 720.0f});
-	}
+		sprite_create(&office_sprite, (vec2){1600.0f, 720.0f}, office_paths, 5);
 
-	{
+		fan_animation_paths = calloc(3 * 37, sizeof(char));
 		for(uint8_t i = 0; i < 3; i++) {
-			char fan_animation_texture_path[256];
-			sprintf(fan_animation_texture_path, "resources/graphics/office/fan/0%d.png", i);
-			fan_animation_textures[i] = texture_create(fan_animation_texture_path, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+			sprintf(fan_animation_paths + (i * 37), "resources/graphics/office/fan/0%u.png", i);
 		}
-		sprite_create(&fan_animation_sprite, *fan_animation_textures, (vec2){137.0f, 196.0f});
-		sprite_set_position(&fan_animation_sprite, (vec3){780.0f, 303.0f});
-	}
+		sprite_create(&fan_animation_sprite, (vec2){137.0f, 196.0f}, fan_animation_paths, 3);
+		sprite_set_position(&fan_animation_sprite, (vec2){780.0f, 303.0f});
+		free(fan_animation_paths);
 
-	{
-		vec2 door_button_positions[2] = {{6.0f, 263.0f}, {1497.0f, 273.0f}};
+		door_button_paths = calloc(8 * 47, sizeof(char));
 		for(uint8_t i = 0; i < 8; i++) {
-			char door_button_texture_path[256];
-			sprintf(door_button_texture_path, "resources/graphics/office/doors/buttons/%s-%d%d.png", (i < 4) ? "left" : "right", ((i % 4) & 0x2) >> 1, (i % 4) & 0x1);
-			door_button_textures[i] = texture_create(door_button_texture_path, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+			sprintf(door_button_paths + (i * 47), "resources/graphics/office/doors/buttons/%c%u.png", 'l' + ((i >= 4) * 6), i & 0b11);
 		}
 
 		for(uint8_t i = 0; i < 2; i++) {
-			sprite_create(&door_button_sprites[i], door_button_textures[i * 4], (vec2){92.0f, 247.0f});
+			sprite_create(&door_button_sprites[i], (vec2){92.0f, 247.0f}, door_button_paths + (i * 47 * 4), 4);
 			sprite_set_position(&door_button_sprites[i], door_button_positions[i]);
 		}
+		free(door_button_paths);
+
+		door_animation_paths = calloc(15 * 39, sizeof(char));
+		for(uint8_t i = 0; i < 15; i++) {
+			sprintf(door_animation_paths + (i * 39), "resources/graphics/office/doors/%u%u.png", (i < 10) ? 0 : 1, i % 10);
+		}
+
+		for(uint8_t i = 0; i < 2; i++) {
+			sprite_create(&door_animation_sprites[i], (vec2){223.0f, 720.0f}, door_animation_paths, 15);
+			sprite_set_position(&door_animation_sprites[i], door_positions[i]);
+		}
+		free(door_animation_paths);
 	}
 
-	for(uint8_t i = 0; i < 15; i++) {
-		char door_texture_path[256];
-		sprintf(door_texture_path, "resources/graphics/office/doors/%d%d.png", (i < 10) ? 0 : 1, i % 10);
-		door_animation_textures[i] = texture_create(door_texture_path, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+	{ /* set up audio engine */
+		const char *sound_device_name;
+		ALCdevice *sound_device;
+		ALCcontext *sound_context;
+		sound_device = alcOpenDevice(NULL);
+		if(!sound_device) {
+		    printf("ERROR: Audio Device fucked up.");
+		    return 1;
+		}
+		
+		sound_context = alcCreateContext(sound_device, NULL);
+		if(!sound_context) {
+		    printf("ERROR: Audio Context fucked up.");
+		    return 1;
+		}
+		
+		if(!alcMakeContextCurrent(sound_context)) {
+		    printf("ERROR: Making context fucked up.");
+		    return 1;
+		}
+		
+		if(alcIsExtensionPresent(sound_device, "ALC_ENUMERATE_ALL_EXT")) {
+		    sound_device_name = alcGetString(sound_device, ALC_ALL_DEVICES_SPECIFIER);
+		} else {
+			sound_device_name = NULL;
+		}
+		
+		if(!sound_device_name || alcGetError(sound_device) != AL_NO_ERROR) {
+		    sound_device_name = alcGetString(sound_device, ALC_DEVICE_SPECIFIER);
+		}
+		printf("SOUND DEVICE: %s\n", sound_device_name);
 	}
-	sprite_create(&door_sprites[0], *door_animation_textures, (vec2){223.0f, 720.0f});
-	sprite_set_position(&door_sprites[0], (vec2){72.0f, -1.0f});
-	sprite_create(&door_sprites[1], *door_animation_textures, (vec2){223.0f, 720.0f});
-	sprite_set_position(&door_sprites[1], (vec2){1270.0f, -2.0f});
 
-	/* set up audio engine */
-	sound_device = alcOpenDevice(NULL);
-	if(!sound_device) {
-	    printf("ERROR: Audio Device fucked up.");
-	    return 1;
-	}
-	
-	sound_context = alcCreateContext(sound_device, NULL);
-	if(!sound_context) {
-	    printf("ERROR: Audio Context fucked up.");
-	    return 1;
-	}
-	
-	if(!alcMakeContextCurrent(sound_context)) {
-	    printf("ERROR: Making context fucked up.");
-	    return 1;
-	}
-	
-	if(alcIsExtensionPresent(sound_device, "ALC_ENUMERATE_ALL_EXT")) {
-	    sound_device_name = alcGetString(sound_device, ALC_ALL_DEVICES_SPECIFIER);
-	} else {
-		sound_device_name = NULL;
-	}
-	
-	if(!sound_device_name || alcGetError(sound_device) != AL_NO_ERROR) {
-	    sound_device_name = alcGetString(sound_device, ALC_DEVICE_SPECIFIER);
-	}
-	printf("SOUND DEVICE: %s\n", sound_device_name);
-	
 	/* load sounds */
 	fan_sound_buffer = sound_buffer_create("resources/audio/sounds/fan.wav");
 	fan_sound_source = sound_source_create(fan_sound_buffer, 1.0f, 0.25f, GLM_VEC3_ZERO, 1);
@@ -331,6 +323,7 @@ int main() {
 	}
 
 	{/* generate buffers for render texture */
+		uint32_t render_vbo;
 		float render_vertices[] = {
 			-1.0f,	-1.0f,	0.0f, 0.0f,
 			 1.0f,	-1.0f,	1.0f, 0.0f,
@@ -360,6 +353,8 @@ int main() {
 
 	/* main loop */
 	while(!glfwWindowShouldClose(window)) {
+		ivec2 mouse_position;
+
 		/* calculate deltatime */
 		float time_delta;
 		time_now = glfwGetTime();
@@ -441,11 +436,6 @@ int main() {
 				}
 			}
 
-			/* update button textures */
-			for(uint8_t i = 0; i < 2; i++) {
-				door_button_sprites[i].texture = door_button_textures[((door_button_flags >> (i * 2)) & 0b0011) + (i * 4)];
-			}
-
 			mouse_has_clicked = 1;
 		}
 
@@ -457,7 +447,6 @@ int main() {
 			float ticks = time_delta * 60.0f;
 			fan_animation_frame += ticks;
 			fan_animation_frame = fmodf(fan_animation_frame, 3);
-			fan_animation_sprite.texture = fan_animation_textures[(uint8_t)fan_animation_frame];
 
 			/* update door animations */
 			for(uint8_t i = 0; i < 2; i++) {
@@ -467,18 +456,17 @@ int main() {
 					door_frame_timers[i] -= ticks;
 				}
 				door_frame_timers[i] = clampf(door_frame_timers[i], 0.0f, 28.0f);
-				door_sprites[i].texture = door_animation_textures[(uint8_t)(door_frame_timers[i] / 2)];
 			}
 
 			animation_timer += time_delta;
 			if(animation_timer > ANIMATION_FRAMETIME) {
 				/* light flicker effect */
 				uint8_t light_random = rand() % 10;
-				office_sprite.texture = office_textures[0];
 				alSourcef(light_sound_source, AL_GAIN, 0.0f);
+				office_sprite_state = 0;
 				for(uint8_t i = 0; i < 2; i++) {
 					if(door_button_flags & (DOOR_BUTTON_LIGHT_FLAG << (i * 2))) {
-						office_sprite.texture = office_textures[(i + 1) * (light_random > 0)];
+						office_sprite_state = (i + 1) * (light_random > 0);
 						alSourcef(light_sound_source, AL_GAIN, (float)(light_random > 0));
 					}
 				}
@@ -503,17 +491,17 @@ int main() {
 		glUniformMatrix4fv(glGetUniformLocation(sprite_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
 
 		glUniform1i(glGetUniformLocation(sprite_shader_program, "follow_camera"), 0);
-		sprite_draw(office_sprite, sprite_shader_program);
-		sprite_draw(fan_animation_sprite, sprite_shader_program);
+		sprite_draw(office_sprite, sprite_shader_program, office_sprite_state);
+		sprite_draw(fan_animation_sprite, sprite_shader_program, (uint8_t)fan_animation_frame);
 
-		sprite_draw(door_sprites[0], sprite_shader_program);
+		for(uint8_t i = 0; i < 2; i++) {
+			sprite_draw(door_animation_sprites[i], sprite_shader_program, (uint8_t)(door_frame_timers[i] / 2));
+			glUniform1i(glGetUniformLocation(sprite_shader_program, "flip_x"), !i);
+		}
 
-		glUniform1i(glGetUniformLocation(sprite_shader_program, "flip_x"), 1);
-		sprite_draw(door_sprites[1], sprite_shader_program);
-		glUniform1i(glGetUniformLocation(sprite_shader_program, "flip_x"), 0);
-
-		sprite_draw(door_button_sprites[0], sprite_shader_program);
-		sprite_draw(door_button_sprites[1], sprite_shader_program);
+		for(uint8_t i = 0; i < 2; i++) {
+			sprite_draw(door_button_sprites[i], sprite_shader_program, (door_button_flags >> (2 * i)) & 0b11);
+		}
 
 		/*
 		glUseProgram(font_shader_program);
@@ -540,38 +528,12 @@ int main() {
 	/* destroy everything */
 	glDeleteFramebuffers(1, &fbo);
 
-	texture_destroy(&fan_animation_textures[0]);
-	texture_destroy(&fan_animation_textures[1]);
-	texture_destroy(&fan_animation_textures[2]);
-
-	texture_destroy(&office_textures[0]);
-	texture_destroy(&office_textures[1]);
-	texture_destroy(&office_textures[2]);
-
-	texture_destroy(&door_button_textures[0]);
-	texture_destroy(&door_button_textures[1]);
-	texture_destroy(&door_button_textures[2]);
-	texture_destroy(&door_button_textures[3]);
-	texture_destroy(&door_button_textures[4]);
-	texture_destroy(&door_button_textures[5]);
-	texture_destroy(&door_button_textures[6]);
-	texture_destroy(&door_button_textures[7]);
-
-	texture_destroy(&door_animation_textures[ 0]);
-	texture_destroy(&door_animation_textures[ 1]);
-	texture_destroy(&door_animation_textures[ 2]);
-	texture_destroy(&door_animation_textures[ 3]);
-	texture_destroy(&door_animation_textures[ 4]);
-	texture_destroy(&door_animation_textures[ 5]);
-	texture_destroy(&door_animation_textures[ 6]);
-	texture_destroy(&door_animation_textures[ 7]);
-	texture_destroy(&door_animation_textures[ 8]);
-	texture_destroy(&door_animation_textures[ 8]);
-	texture_destroy(&door_animation_textures[10]);
-	texture_destroy(&door_animation_textures[11]);
-	texture_destroy(&door_animation_textures[12]);
-	texture_destroy(&door_animation_textures[13]);
-	texture_destroy(&door_animation_textures[14]);
+	sprite_destroy(&fan_animation_sprite);
+	sprite_destroy(&office_sprite);
+	sprite_destroy(&door_button_sprites[0]);
+	sprite_destroy(&door_button_sprites[1]);
+	sprite_destroy(&door_animation_sprites[0]);
+	sprite_destroy(&door_animation_sprites[1]);
 
 	glDeleteShader(sprite_shader_program);
 	glDeleteShader(font_shader_program);

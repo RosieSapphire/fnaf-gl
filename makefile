@@ -1,6 +1,6 @@
 CC=clang
-INC=-I./include/ -I/usr/include -I/usr/local/include/
-LIB=-lglfw -lGL -lX11 -lpthread -lXrandr -ldl -lcglm -lfreetype -lalut -lopenal -lsndfile -lm
+INC=-Iinclude/
+LIB=-Llib -lglfw3 -lpthread -ldl -lcglm -lfreetype -lalut -lopenal -lsndfile -lm
 
 CFLAGS=-std=c99
 

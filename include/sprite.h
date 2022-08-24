@@ -3,19 +3,24 @@
 
 #include <stdint.h>
 #include <cglm/cglm.h>
+#include "texture.h"
 
 typedef struct {
 	uint32_t vao;
 	uint32_t vbo;
-	uint32_t texture;
-	uint32_t padding;
+	uint64_t padding0;
 	mat4 matrix;
 	vec2 size;
-	uint64_t padding2;
+	texture_t* textures;
+	uint16_t texture_count;
+	uint16_t padding3;
+	uint32_t padding2;
+	uint64_t padding1;
 } sprite_t;
 
-void sprite_create(sprite_t *sprite, uint32_t texture, vec2 size);
+void sprite_create(sprite_t *sprite, vec2 size, char *texture_paths, const uint16_t texture_count);
 void sprite_set_position(sprite_t *sprite, vec2 position);
-void sprite_draw(sprite_t sprite, uint32_t shader);
+void sprite_draw(sprite_t sprite, uint32_t shader, const uint16_t texture_index);
+void sprite_destroy(sprite_t *sprite);
 
 #endif
