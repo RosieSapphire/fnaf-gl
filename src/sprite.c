@@ -45,7 +45,7 @@ void sprite_set_position(sprite_t *sprite, vec2 position) {
 	position_converted[1] = 720 - position[1] - sprite->size[1];
 	position_converted[2] = 0.0f;
 
-	glm_mat4_copy(sprite->matrix, GLM_MAT4_IDENTITY);
+	glm_mat4_copy(GLM_MAT4_IDENTITY, sprite->matrix);
 	glm_translate(sprite->matrix, position_converted);
 }
 

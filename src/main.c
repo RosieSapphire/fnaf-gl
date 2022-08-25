@@ -59,11 +59,13 @@ static uint8_t office_sprite_state = 0;
 
 static sprite_t power_usage_sprite;
 static uint8_t power_usage_value;
+static sprite_t power_usage_text_sprite;
+
 static sprite_t power_left_sprite;
 static sprite_t power_left_percent_sprite;
-static float power_left_value = 100.0f;
+static sprite_t power_left_number_sprite;
+static float power_left_value = 99.9f;
 
-static sprite_t power_usage_text_sprite;
 
 /* sound sources and buffers */
 static uint32_t fan_sound_source;
@@ -215,6 +217,14 @@ int main() {
 		sprite_set_position(&power_left_sprite, (vec2){38, 631});
 		sprite_create(&power_left_percent_sprite, (vec2){11, 14}, power_left_percent_path, 1);
 		sprite_set_position(&power_left_percent_sprite, (vec2){228, 632});
+
+		power_left_number_paths = calloc(10 * 50, sizeof(char));
+		for(uint8_t i = 0; i < 10; i++) {
+			sprintf(power_left_number_paths + (i * 50), "resources/graphics/office/ui/power/numbers/0%u.png", i);
+		}
+		sprite_create(&power_left_number_sprite, (vec2){18, 22}, power_left_number_paths, 10);
+		sprite_set_position(&power_left_number_sprite, (vec2){203, 624});
+		free(power_left_number_paths);
 	}
 
 	{ /* set up audio engine */
@@ -560,6 +570,13 @@ int main() {
 
 		sprite_draw(power_left_sprite, render_ui_shader_program, 0);
 		sprite_draw(power_left_percent_sprite, render_ui_shader_program, 0);
+
+		power_left_value -= time_delta;
+		for(uint8_t i = 0; i < 2; i++) {
+			sprite_set_position(&power_left_number_sprite, (vec2){203 - (i * 18), 624});
+			sprite_draw(power_left_number_sprite, render_ui_shader_program, (uint8_t)(power_left_value / powf(10, i)) % 10);
+		}
+		printf("\n");
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
