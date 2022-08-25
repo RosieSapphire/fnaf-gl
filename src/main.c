@@ -27,6 +27,8 @@
 #define DOOR_BUTTON_LIGHT_FLAG			0x1
 #define DOOR_BUTTON_DOOR_FLAG			0x2
 
+#define CAM_TIMER_INIT 					0.35f
+
 static GLFWwindow *window;
 static uint8_t mouse_has_clicked = 0;
 
@@ -66,18 +68,39 @@ static sprite_t power_left_percent_sprite;
 static sprite_t power_left_number_sprite;
 static float power_left_value = 99.9f;
 
-static sprite_t cam_flip_bar_sprite;
+static enum {
+	CAM_STATE_CLOSED = 0,
+	CAM_STATE_OPENING,
+	CAM_STATE_OPENED,
+	CAM_STATE_CLOSING
+};
 
-/* sound sources and buffers */
+static sprite_t cam_flip_bar_sprite;
+static sprite_t cam_flip_animation_sprite;
+static uint8_t cam_bar_hovering = 0;
+static uint8_t cam_state = CAM_STATE_CLOSED;
+static float cam_flip_timer = CAM_TIMER_INIT;
+
+/* sound sources */
 static uint32_t fan_sound_source;
 static uint32_t light_sound_source;
 static uint32_t door_sound_source;
 static uint32_t freddy_nose_sound_source;
 
+static uint32_t cam_open_sound_source;
+static uint32_t cam_scan_sound_source;
+static uint32_t cam_close_sound_source;
+static uint32_t cam_blip_sound_source;
+
 static uint32_t fan_sound_buffer;
 static uint32_t light_sound_buffer;
 static uint32_t door_sound_buffer;
 static uint32_t freddy_nose_sound_buffer;
+
+static uint32_t cam_open_sound_buffer;
+static uint32_t cam_scan_sound_buffer;
+static uint32_t cam_close_sound_buffer;
+static uint32_t cam_blip_sound_buffer;
 
 static uint32_t font_vao;
 static uint32_t font_vbo;
@@ -167,6 +190,7 @@ int main() {
 		const char *power_left_percent_path = "resources/graphics/office/ui/power/power-left-1.png";
 		const char *power_left_number_paths;
 		const char *cam_flip_bar_path = "resources/graphics/office/ui/camera/bar.png";
+		const char *cam_flip_animation_paths;
 
 		office_paths = calloc(5 * 39, sizeof(char));
 		for(uint8_t i = 0; i < 5; i++) {
@@ -230,6 +254,13 @@ int main() {
 
 		sprite_create(&cam_flip_bar_sprite, (vec2){600, 60}, cam_flip_bar_path, 1);
 		sprite_set_position(&cam_flip_bar_sprite, (vec2){255, 638});
+
+		cam_flip_animation_paths = calloc(11 * 45, sizeof(char));
+		for(uint8_t i = 0; i < 11; i++) {
+			sprintf(cam_flip_animation_paths + (i * 45), "resources/graphics/office/camera/flip/%u%u.png", (int8_t)((float)i / 10), i % 10);
+		}
+		sprite_create(&cam_flip_animation_sprite, (vec2){1280, 720}, cam_flip_animation_paths, 11);
+		free(cam_flip_animation_paths);
 	}
 
 	{ /* set up audio engine */
@@ -277,6 +308,18 @@ int main() {
 
 	freddy_nose_sound_buffer = sound_buffer_create("resources/audio/sounds/boop.wav");
 	freddy_nose_sound_source = sound_source_create(freddy_nose_sound_buffer, 1.0f, 0.4f, GLM_VEC3_ZERO, 0);
+
+	cam_open_sound_buffer = sound_buffer_create("resources/audio/sounds/cam-open.wav");
+	cam_open_sound_source = sound_source_create(cam_open_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
+
+	cam_scan_sound_buffer = sound_buffer_create("resources/audio/sounds/cam-scan.wav");
+	cam_scan_sound_source = sound_source_create(cam_scan_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
+
+	cam_close_sound_buffer = sound_buffer_create("resources/audio/sounds/cam-close.wav");
+	cam_close_sound_source = sound_source_create(cam_close_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
+
+	cam_blip_sound_buffer = sound_buffer_create("resources/audio/sounds/blip.wav");
+	cam_blip_sound_source = sound_source_create(cam_blip_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
 
 	/* set up audio listener */
 	alListeneri(AL_DISTANCE_MODEL, AL_INVERSE_DISTANCE_CLAMPED);
@@ -425,24 +468,71 @@ int main() {
 
 		/* use the appropriate room scroll setting */
 		mouse_get_position(window, mouse_position);
-		if(!office_look_use_alternate) {
-			/* default room turning */
-			float mouse_distance_from_center;
-			mouse_distance_from_center = mouse_position[0] - (WINDOW_WIDTH / 2.0f);
+		if(cam_state != CAM_STATE_OPENED) {
+			if(!office_look_use_alternate) {
+				/* default room turning */
+				float mouse_distance_from_center;
+				mouse_distance_from_center = mouse_position[0] - (WINDOW_WIDTH / 2.0f);
 
-			mouse_distance_from_center = clampf(mouse_distance_from_center, -640.0f, 640.0f);
-			mouse_distance_from_center *= !(fabsf(mouse_distance_from_center) < 128.0f);
+				mouse_distance_from_center = clampf(mouse_distance_from_center, -640.0f, 640.0f);
+				mouse_distance_from_center *= !(fabsf(mouse_distance_from_center) < 128.0f);
 
-			office_look_current += -mouse_distance_from_center * time_delta;
-			office_look_current = clampf(office_look_current, -320.0f, 0.0f);
-		} else {
-			/* custom room turning */
-			float office_look_target;
-			float mouse_normalized_x = (float)mouse_position[0] / (float)WINDOW_WIDTH;
+				office_look_current += -mouse_distance_from_center * time_delta;
+				office_look_current = clampf(office_look_current, -320.0f, 0.0f);
+			} else {
+				/* custom room turning */
+				float office_look_target;
+				float mouse_normalized_x = (float)mouse_position[0] / (float)WINDOW_WIDTH;
 
-			mouse_normalized_x = clampf(mouse_normalized_x, 0.0f, 1.0f);
-			office_look_target = mouse_normalized_x * -320;
-			office_look_current += (office_look_target - office_look_current) * time_delta * 8.0f;
+				mouse_normalized_x = clampf(mouse_normalized_x, 0.0f, 1.0f);
+				office_look_target = mouse_normalized_x * -320;
+				office_look_current += (office_look_target - office_look_current) * time_delta * 8.0f;
+			}
+		}
+
+		/* camera flipping */
+		{
+			const uint8_t cam_state_old = cam_state;
+			if(mouse_inside_box(window, (ivec4){75, 75 + 792, 653, 653 + 67}, 0.0f)) {
+				if(!cam_bar_hovering) {
+					cam_bar_hovering = 1;
+					switch(cam_state) {
+						case CAM_STATE_CLOSED:
+							cam_state = CAM_STATE_OPENING;
+							alSourceStop(cam_close_sound_source);
+							alSourcePlay(cam_open_sound_source);
+							alSourcePlay(cam_scan_sound_source);
+							break;
+
+						case CAM_STATE_OPENED:
+							cam_state = CAM_STATE_CLOSING;
+							alSourceStop(cam_open_sound_source);
+							alSourceStop(cam_scan_sound_source);
+							alSourcePlay(cam_close_sound_source);
+							break;
+
+						default:
+							break;
+					}
+				}
+			} else {
+				cam_bar_hovering = 0;
+			}
+
+			if((cam_state == CAM_STATE_OPENING || cam_state == CAM_STATE_CLOSING)) {
+				if(cam_flip_timer > 0.0f) {
+					cam_flip_timer -= time_delta;
+				} else {
+					cam_state++;
+					cam_state %= 4;
+					cam_flip_timer = CAM_TIMER_INIT;
+				}
+			}
+
+			if(cam_state == CAM_STATE_OPENED && cam_state_old != CAM_STATE_OPENED) {
+				door_button_flags &= 0b1010;
+				alSourcePlay(cam_blip_sound_source);
+			}
 		}
 
 		/* check for clicking door buttons */
@@ -450,7 +540,7 @@ int main() {
 			const uint8_t door_button_flags_old = door_button_flags;
 			const int32_t mouse_offset = (int32_t)office_look_current;
 
-			{ /* handle door button presses */
+			if(cam_state != CAM_STATE_OPENED) {
 				const ivec4 door_button_boxes[4] = {{27, 89, 251, 371}, {1519, 1581, 267, 387}, {25, 87, 393, 513}, {1519, 1581, 398, 518}};
 				for(uint8_t i = 0; i < 2; i++) {
 					uint8_t door_button_bit_mask = (DOOR_BUTTON_DOOR_FLAG << (i * 2));
@@ -463,12 +553,12 @@ int main() {
 
 					door_button_flags ^= (door_button_bit_mask >> 1) * mouse_inside_box(window, door_button_boxes[i + 2], mouse_offset);
 				}
-			}
 
-			/* pressing Freddy's nose */
-			if(mouse_inside_box(window, (ivec4){674, 682, 236, 244}, mouse_offset)) {
-				alSourceStop(freddy_nose_sound_source);
-				alSourcePlay(freddy_nose_sound_source);
+				/* pressing Freddy's nose */
+				if(mouse_inside_box(window, (ivec4){674, 682, 236, 244}, mouse_offset)) {
+					alSourceStop(freddy_nose_sound_source);
+					alSourcePlay(freddy_nose_sound_source);
+				}
 			}
 
 			/* handle cases where both lights are toggled */
@@ -583,7 +673,14 @@ int main() {
 			sprite_draw(power_left_number_sprite, render_ui_shader_program, (uint8_t)(power_left_value / powf(10, i)) % 10);
 		}
 
-		sprite_draw(cam_flip_bar_sprite, render_ui_shader_program, 0);
+		if((cam_state == CAM_STATE_CLOSED || cam_state == CAM_STATE_OPENED)) {
+			if(!cam_bar_hovering) {
+				sprite_draw(cam_flip_bar_sprite, render_ui_shader_program, 0);
+			}
+		} else {
+			sprite_draw(cam_flip_animation_sprite, render_ui_shader_program, (uint16_t)(fabsf((10.0f * (cam_state == CAM_STATE_OPENING)) - ((cam_flip_timer * (1 / CAM_TIMER_INIT)) * 10.0f))));
+		}
+
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -592,6 +689,7 @@ int main() {
 	/* destroy everything */
 	glDeleteFramebuffers(1, &fbo);
 
+	sprite_destroy(&cam_flip_animation_sprite);
 	sprite_destroy(&fan_animation_sprite);
 	sprite_destroy(&office_sprite);
 	sprite_destroy(&door_button_sprites[0]);
@@ -604,8 +702,8 @@ int main() {
 	glDeleteShader(render_ui_shader_program);
 	glDeleteShader(render_shader_program);
 
-	alDeleteSources(4, &fan_sound_source);
-	alDeleteBuffers(4, &fan_sound_buffer);
+	alDeleteSources(8, &fan_sound_source);
+	alDeleteBuffers(8, &fan_sound_buffer);
 
 	glfwTerminate();
 	return 0;
