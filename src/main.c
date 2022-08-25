@@ -66,6 +66,7 @@ static sprite_t power_left_percent_sprite;
 static sprite_t power_left_number_sprite;
 static float power_left_value = 99.9f;
 
+static sprite_t cam_flip_bar_sprite;
 
 /* sound sources and buffers */
 static uint32_t fan_sound_source;
@@ -165,6 +166,7 @@ int main() {
 		const char *power_left_path = "resources/graphics/office/ui/power/power-left-0.png";
 		const char *power_left_percent_path = "resources/graphics/office/ui/power/power-left-1.png";
 		const char *power_left_number_paths;
+		const char *cam_flip_bar_path = "resources/graphics/office/ui/camera/bar.png";
 
 		office_paths = calloc(5 * 39, sizeof(char));
 		for(uint8_t i = 0; i < 5; i++) {
@@ -225,6 +227,9 @@ int main() {
 		sprite_create(&power_left_number_sprite, (vec2){18, 22}, power_left_number_paths, 10);
 		sprite_set_position(&power_left_number_sprite, (vec2){203, 624});
 		free(power_left_number_paths);
+
+		sprite_create(&cam_flip_bar_sprite, (vec2){600, 60}, cam_flip_bar_path, 1);
+		sprite_set_position(&cam_flip_bar_sprite, (vec2){255, 638});
 	}
 
 	{ /* set up audio engine */
@@ -488,6 +493,8 @@ int main() {
 			power_usage_value += ((door_button_flags >> (i * 2)) & 0x1) + ((((door_button_flags >> (i * 2)) & 0x2) > 0));
 		}
 
+		power_left_value -= ((float)power_usage_value + 1.0f) * time_delta * 0.1f;
+
 		if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_RELEASE) {
 			mouse_has_clicked = 0;
 		}
@@ -571,12 +578,12 @@ int main() {
 		sprite_draw(power_left_sprite, render_ui_shader_program, 0);
 		sprite_draw(power_left_percent_sprite, render_ui_shader_program, 0);
 
-		power_left_value -= time_delta;
 		for(uint8_t i = 0; i < 2; i++) {
 			sprite_set_position(&power_left_number_sprite, (vec2){203 - (i * 18), 624});
 			sprite_draw(power_left_number_sprite, render_ui_shader_program, (uint8_t)(power_left_value / powf(10, i)) % 10);
 		}
-		printf("\n");
+
+		sprite_draw(cam_flip_bar_sprite, render_ui_shader_program, 0);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
