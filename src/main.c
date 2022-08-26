@@ -116,7 +116,8 @@ static uint32_t font_vao;
 static uint32_t font_vbo;
 static uint32_t font_shader_program;
 
-static float office_look_current = 0.0f; static uint8_t office_look_use_alternate = 0;
+static float office_look_current = 0.0f;
+static uint8_t office_look_use_alternate = 0;
 static uint8_t office_look_use_alternate_pressed = 0;
 
 static mat4 matrix_projection;
@@ -464,6 +465,7 @@ int main() {
 			if(mouse_inside_box(window, (ivec4){75, 75 + 792, 653, 653 + 67}, 0.0f)) {
 				if(!cam_bar_hovering) {
 					cam_bar_hovering = 1;
+
 					switch(cam_state) {
 						case CAM_STATE_CLOSED:
 							cam_state = CAM_STATE_OPENING;
@@ -483,11 +485,11 @@ int main() {
 							break;
 					}
 				}
-			} else {
-				cam_bar_hovering = 0;
 			}
 
-			if((cam_state == CAM_STATE_OPENING || cam_state == CAM_STATE_CLOSING)) {
+			cam_bar_hovering *= !(mouse_position[1] < 643.0);
+
+			if(cam_state == CAM_STATE_OPENING || cam_state == CAM_STATE_CLOSING) {
 				if(cam_flip_timer > 0.0f) {
 					cam_flip_timer -= time_delta;
 				} else {
