@@ -2,8 +2,8 @@
 
 layout(location = 0) in vec4 a_vertex;
 
-uniform mat4 model;
 uniform mat4 projection;
+uniform mat4 model;
 
 out vec2 uv;
 

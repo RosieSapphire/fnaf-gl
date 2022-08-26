@@ -18,7 +18,7 @@ typedef struct {
 	uint64_t padding1;
 } sprite_t;
 
-void sprite_create(sprite_t *sprite, vec2 size, char *texture_paths, const uint16_t texture_count);
+void sprite_create(sprite_t *sprite, vec2 pos, vec2 size, const char *path_format, const uint16_t texture_count);
 void sprite_set_position(sprite_t *sprite, vec2 position);
 void sprite_draw(sprite_t sprite, uint32_t shader, const uint16_t texture_index);
 void sprite_destroy(sprite_t *sprite);

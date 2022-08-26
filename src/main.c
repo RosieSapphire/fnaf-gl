@@ -30,6 +30,8 @@
 #define CAM_TIMER_INIT 					0.35f
 
 static GLFWwindow *window;
+static ALCdevice *sound_device;
+static ALCcontext *sound_context;
 static uint8_t mouse_has_clicked = 0;
 
 static float animation_timer = 0.0f;
@@ -38,7 +40,7 @@ static uint32_t fbo;
 static uint32_t rbo;
 static uint32_t render_vao;
 
-static double time_now, time_last;
+static double time_last;
 
 static uint32_t render_texture;
 static uint32_t render_shader_program;
@@ -175,98 +177,26 @@ int main() {
 	sprite_shader_program = shader_create("resources/shaders/sprite_vertex.glsl", "resources/shaders/sprite_fragment.glsl");
 
 	{ /* load sprites */
-		const char *office_paths;
-
-		const char *fan_animation_paths;
-
 		const vec2 door_positions[2] = {{72.0f, -1.0f}, {1270.0f, -2.0f}};
-		const vec2 door_button_positions[2] = {{6.0f, 263.0f}, {1497.0f, 273.0f}};
-		const char *door_button_paths;
-		const char *door_animation_paths;
-
-		const char *power_usage_paths;
-		const char *power_usage_text_path = "resources/graphics/office/ui/power/usage.png";
-		const char *power_left_path = "resources/graphics/office/ui/power/power-left-0.png";
-		const char *power_left_percent_path = "resources/graphics/office/ui/power/power-left-1.png";
-		const char *power_left_number_paths;
-		const char *cam_flip_bar_path = "resources/graphics/office/ui/camera/bar.png";
-		const char *cam_flip_animation_paths;
-
-		office_paths = calloc(5 * 39, sizeof(char));
-		for(uint8_t i = 0; i < 5; i++) {
-			sprintf(office_paths + (i * 39), "resources/graphics/office/states/%u.png", i);
-		}
-		sprite_create(&office_sprite, (vec2){1600.0f, 720.0f}, office_paths, 5);
-
-		fan_animation_paths = calloc(3 * 37, sizeof(char));
-		for(uint8_t i = 0; i < 3; i++) {
-			sprintf(fan_animation_paths + (i * 37), "resources/graphics/office/fan/0%u.png", i);
-		}
-		sprite_create(&fan_animation_sprite, (vec2){137.0f, 196.0f}, fan_animation_paths, 3);
-		sprite_set_position(&fan_animation_sprite, (vec2){780.0f, 303.0f});
-		free(fan_animation_paths);
-
-		door_button_paths = calloc(8 * 47, sizeof(char));
-		for(uint8_t i = 0; i < 8; i++) {
-			sprintf(door_button_paths + (i * 47), "resources/graphics/office/doors/buttons/%c%u.png", 'l' + ((i >= 4) * 6), i & 0b11);
-		}
-
 		for(uint8_t i = 0; i < 2; i++) {
-			sprite_create(&door_button_sprites[i], (vec2){92.0f, 247.0f}, door_button_paths + (i * 47 * 4), 4);
-			sprite_set_position(&door_button_sprites[i], door_button_positions[i]);
-		}
-		free(door_button_paths);
-
-		door_animation_paths = calloc(15 * 39, sizeof(char));
-		for(uint8_t i = 0; i < 15; i++) {
-			sprintf(door_animation_paths + (i * 39), "resources/graphics/office/doors/%u%u.png", (i < 10) ? 0 : 1, i % 10);
+			sprite_create(&door_animation_sprites[i], door_positions[i], (vec2){223.0f, 720.0f}, "resources/graphics/office/doors/", 15);
 		}
 
-		for(uint8_t i = 0; i < 2; i++) {
-			sprite_create(&door_animation_sprites[i], (vec2){223.0f, 720.0f}, door_animation_paths, 15);
-			sprite_set_position(&door_animation_sprites[i], door_positions[i]);
-		}
-		free(door_animation_paths);
-
-		power_usage_paths = calloc(4 * 49, sizeof(char));
-		for(uint8_t i = 0; i < 4; i++) {
-			sprintf(power_usage_paths + (i * 49), "resources/graphics/office/ui/power/levels/0%u.png", i);
-		}
-		sprite_create(&power_usage_sprite, (vec2){103, 32}, power_usage_paths, 4);
-		sprite_set_position(&power_usage_sprite, (vec2){120, 657});
-		free(power_usage_paths);
-
-		sprite_create(&power_usage_text_sprite, (vec2){72, 14}, power_usage_text_path, 1);
-		sprite_set_position(&power_usage_text_sprite, (vec2){38, 667});
-
-		sprite_create(&power_left_sprite, (vec2){137, 14}, power_left_path, 1);
-		sprite_set_position(&power_left_sprite, (vec2){38, 631});
-		sprite_create(&power_left_percent_sprite, (vec2){11, 14}, power_left_percent_path, 1);
-		sprite_set_position(&power_left_percent_sprite, (vec2){228, 632});
-
-		power_left_number_paths = calloc(10 * 50, sizeof(char));
-		for(uint8_t i = 0; i < 10; i++) {
-			sprintf(power_left_number_paths + (i * 50), "resources/graphics/office/ui/power/numbers/0%u.png", i);
-		}
-		sprite_create(&power_left_number_sprite, (vec2){18, 22}, power_left_number_paths, 10);
-		sprite_set_position(&power_left_number_sprite, (vec2){203, 624});
-		free(power_left_number_paths);
-
-		sprite_create(&cam_flip_bar_sprite, (vec2){600, 60}, cam_flip_bar_path, 1);
-		sprite_set_position(&cam_flip_bar_sprite, (vec2){255, 638});
-
-		cam_flip_animation_paths = calloc(11 * 45, sizeof(char));
-		for(uint8_t i = 0; i < 11; i++) {
-			sprintf(cam_flip_animation_paths + (i * 45), "resources/graphics/office/camera/flip/%u%u.png", (int8_t)((float)i / 10), i % 10);
-		}
-		sprite_create(&cam_flip_animation_sprite, (vec2){1280, 720}, cam_flip_animation_paths, 11);
-		free(cam_flip_animation_paths);
+		sprite_create(&door_button_sprites[0], (vec2){6.0f, 263.0f}, (vec2){92.0f, 247.0f}, "resources/graphics/office/doors/buttons/l", 4);
+		sprite_create(&door_button_sprites[1], (vec2){1497.0f, 273.0f}, (vec2){92.0f, 247.0f}, "resources/graphics/office/doors/buttons/r", 4);
+		sprite_create(&office_sprite, GLM_VEC2_ZERO, (vec2){1600.0f, 720.0f}, "resources/graphics/office/states/", 5);
+		sprite_create(&fan_animation_sprite, (vec2){780.0f, 303.0f}, (vec2){137.0f, 196.0f}, "resources/graphics/office/fan/", 3);
+		sprite_create(&power_usage_sprite, (vec2){120, 657}, (vec2){103, 32}, "resources/graphics/office/ui/power/levels/", 4);
+		sprite_create(&power_usage_text_sprite, (vec2){38, 667}, (vec2){72, 14}, "resources/graphics/office/ui/power/usage.png", 1);
+		sprite_create(&power_left_sprite, (vec2){38, 631}, (vec2){137, 14}, "resources/graphics/office/ui/power/power-left-0.png", 1);
+		sprite_create(&power_left_percent_sprite, (vec2){228, 632}, (vec2){11, 14}, "resources/graphics/office/ui/power/power-left-1.png", 1);
+		sprite_create(&power_left_number_sprite, GLM_VEC2_ZERO, (vec2){18, 22}, "resources/graphics/office/ui/power/numbers/", 10);
+		sprite_create(&cam_flip_bar_sprite, (vec2){255, 638}, (vec2){600, 60}, "resources/graphics/office/ui/camera/bar.png", 1);
+		sprite_create(&cam_flip_animation_sprite, GLM_VEC2_ZERO, (vec2){1280, 720}, "resources/graphics/office/ui/camera/flip/", 11);
 	}
 
 	{ /* set up audio engine */
 		const char *sound_device_name;
-		ALCdevice *sound_device;
-		ALCcontext *sound_context;
 		sound_device = alcOpenDevice(NULL);
 		if(!sound_device) {
 		    printf("ERROR: Audio Device fucked up.");
@@ -284,10 +214,9 @@ int main() {
 		    return 1;
 		}
 		
+		sound_device_name = NULL;
 		if(alcIsExtensionPresent(sound_device, "ALC_ENUMERATE_ALL_EXT")) {
 		    sound_device_name = alcGetString(sound_device, ALC_ALL_DEVICES_SPECIFIER);
-		} else {
-			sound_device_name = NULL;
 		}
 		
 		if(!sound_device_name || alcGetError(sound_device) != AL_NO_ERROR) {
@@ -386,10 +315,6 @@ int main() {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	/* get time ready */
-	time_now = glfwGetTime();
-	time_last = time_now;
-
 	/* set up framebuffer */
 	glGenFramebuffers(1, &fbo);
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -443,10 +368,12 @@ int main() {
 	alSourcePlay(light_sound_source);
 
 	/* main loop */
+	srand(time(NULL));
 	while(!glfwWindowShouldClose(window)) {
 		ivec2 mouse_position;
 
 		/* calculate deltatime */
+		double time_now;
 		float time_delta;
 		time_now = glfwGetTime();
 		time_delta = time_now - time_last;
@@ -607,16 +534,16 @@ int main() {
 			animation_timer += time_delta;
 			if(animation_timer > ANIMATION_FRAMETIME) {
 				/* light flicker effect */
+				float light_buzz_volume_new = 0.0f;
 				uint8_t light_random = rand() % 10;
-				alSourcef(light_sound_source, AL_GAIN, 0.0f);
 				office_sprite_state = 0;
 				for(uint8_t i = 0; i < 2; i++) {
 					if(door_button_flags & (DOOR_BUTTON_LIGHT_FLAG << (i * 2))) {
 						office_sprite_state = (i + 1) * (light_random > 0);
-						alSourcef(light_sound_source, AL_GAIN, (float)(light_random > 0));
+						light_buzz_volume_new = clampf((float)light_random, 0.0f, 1.0f);
 					}
 				}
-
+				alSourcef(light_sound_source, AL_GAIN, light_buzz_volume_new);
 				animation_timer = 0.0f;
 			}
 		}
@@ -692,10 +619,10 @@ int main() {
 	sprite_destroy(&cam_flip_animation_sprite);
 	sprite_destroy(&fan_animation_sprite);
 	sprite_destroy(&office_sprite);
-	sprite_destroy(&door_button_sprites[0]);
-	sprite_destroy(&door_button_sprites[1]);
-	sprite_destroy(&door_animation_sprites[0]);
-	sprite_destroy(&door_animation_sprites[1]);
+	sprite_destroy(door_button_sprites);
+	sprite_destroy(door_button_sprites + 1);
+	sprite_destroy(door_animation_sprites);
+	sprite_destroy(door_animation_sprites + 1);
 
 	glDeleteShader(sprite_shader_program);
 	glDeleteShader(font_shader_program);
@@ -704,6 +631,9 @@ int main() {
 
 	alDeleteSources(8, &fan_sound_source);
 	alDeleteBuffers(8, &fan_sound_buffer);
+
+	alcDestroyContext(sound_context);
+	alcCloseDevice(sound_device);
 
 	glfwTerminate();
 	return 0;

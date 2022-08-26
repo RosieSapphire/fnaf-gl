@@ -2,10 +2,13 @@
 #include "texture.h"
 
 #include <glad/glad.h>
+#include <stdarg.h>
 
-void sprite_create(sprite_t *sprite, vec2 size, char *texture_paths, const uint16_t texture_count) {
+void sprite_create(sprite_t *sprite, vec2 pos, vec2 size, const char *path_format, const uint16_t texture_count) {
+	char *paths;
 	uint8_t texture_path_length = 0;
-	char *c = texture_paths;
+	uint8_t chars_excluded = 0;
+	const char *c = path_format;
 	const float vertices[] = {
 		0.0f,		0.0f,		0.0f, 0.0f,
 		size[0],	0.0f,		1.0f, 0.0f,
@@ -30,13 +33,27 @@ void sprite_create(sprite_t *sprite, vec2 size, char *texture_paths, const uint1
 	sprite->textures = calloc(texture_count, sizeof(texture_t));
 	sprite->texture_count = texture_count;
 	
-	while(*c) { c++; }
-	texture_path_length = (uint8_t)(c - texture_paths);
-	for(uint16_t i = 0; i < texture_count; i++) {
-		sprite->textures[i] = texture_create(texture_paths + (i * (texture_path_length + 1)), GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR, 0);
+	while(*c) {
+		if(*c == '%') {
+			chars_excluded++;
+			continue;
+		} c++;
 	}
 
-	glm_mat4_copy(GLM_MAT4_IDENTITY, sprite->matrix);
+	texture_path_length = (uint8_t)(c - path_format - chars_excluded) + 2;
+	paths = calloc(texture_count * texture_path_length, sizeof(char));
+	if(texture_count - 1) {
+		for(uint16_t i = 0; i < texture_count; i++) {
+			const uint32_t offset = (i * texture_path_length);
+			sprintf(paths + offset, "%s%u.png", path_format, i);
+			sprite->textures[i] = texture_create(paths + offset, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR, 0);
+		}
+	} else {
+		sprintf(paths, "%s", path_format);
+		*sprite->textures = texture_create(paths, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR, 0);
+	}
+	free(paths);
+	sprite_set_position(sprite, pos);
 }
 
 void sprite_set_position(sprite_t *sprite, vec2 position) {
