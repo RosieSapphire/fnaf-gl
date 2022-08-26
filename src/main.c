@@ -34,7 +34,7 @@ static ALCdevice *sound_device;
 static ALCcontext *sound_context;
 static uint8_t mouse_has_clicked = 0;
 
-static float animation_timer = 0.0f;
+static float scaled_update_timer = 0.0f;
 
 static uint32_t fbo;
 static uint32_t rbo;
@@ -69,6 +69,13 @@ static sprite_t power_left_sprite;
 static sprite_t power_left_percent_sprite;
 static sprite_t power_left_number_sprite;
 static float power_left_value = 99.9f;
+
+static sprite_t hour_am_sprite;
+static sprite_t hour_number_sprite;
+static float hour_timer = 0.0f;
+
+static sprite_t night_text_sprite;
+static sprite_t night_number_sprite;
 
 static enum {
 	CAM_STATE_CLOSED = 0,
@@ -193,6 +200,10 @@ int main() {
 		sprite_create(&power_left_number_sprite, GLM_VEC2_ZERO, (vec2){18, 22}, "resources/graphics/office/ui/power/numbers/", 10);
 		sprite_create(&cam_flip_bar_sprite, (vec2){255, 638}, (vec2){600, 60}, "resources/graphics/office/ui/camera/bar.png", 1);
 		sprite_create(&cam_flip_animation_sprite, GLM_VEC2_ZERO, (vec2){1280, 720}, "resources/graphics/office/ui/camera/flip/", 11);
+		sprite_create(&hour_am_sprite, (vec2){1200, 31}, (vec2){42, 26}, "resources/graphics/office/ui/am.png", 1);
+		sprite_create(&hour_number_sprite, (vec2){1161, 29}, (vec2){24, 30}, "resources/graphics/office/ui/hour/", 6);
+		sprite_create(&night_text_sprite, (vec2){1148, 74}, (vec2){63, 14}, "resources/graphics/office/ui/night/night.png", 1);
+		sprite_create(&night_number_sprite, (vec2){1223, 72}, (vec2){14, 17}, "resources/graphics/office/ui/night/", 7);
 	}
 
 	{ /* set up audio engine */
@@ -509,8 +520,9 @@ int main() {
 		for(uint8_t i = 0; i < 2; i++) {
 			power_usage_value += ((door_button_flags >> (i * 2)) & 0x1) + ((((door_button_flags >> (i * 2)) & 0x2) > 0));
 		}
+		power_usage_value += cam_state == CAM_STATE_OPENED;
 
-		power_left_value -= ((float)power_usage_value + 1.0f) * time_delta * 8.1f;
+		power_left_value -= ((float)power_usage_value + 1.0f) * time_delta * 0.1f;
 
 		if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_RELEASE) {
 			mouse_has_clicked = 0;
@@ -531,8 +543,8 @@ int main() {
 				door_frame_timers[i] = clampf(door_frame_timers[i], 0.0f, 28.0f);
 			}
 
-			animation_timer += time_delta;
-			if(animation_timer > ANIMATION_FRAMETIME) {
+			scaled_update_timer += time_delta;
+			if(scaled_update_timer > ANIMATION_FRAMETIME) {
 				/* light flicker effect */
 				float light_buzz_volume_new = 0.0f;
 				uint8_t light_random = rand() % 10;
@@ -544,7 +556,7 @@ int main() {
 					}
 				}
 				alSourcef(light_sound_source, AL_GAIN, light_buzz_volume_new);
-				animation_timer = 0.0f;
+				scaled_update_timer = 0.0f;
 			}
 		}
 
@@ -563,15 +575,18 @@ int main() {
 		glUniformMatrix4fv(glGetUniformLocation(sprite_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
 
 		sprite_draw(office_sprite, sprite_shader_program, office_sprite_state);
-		sprite_draw(fan_animation_sprite, sprite_shader_program, (uint8_t)fan_animation_frame);
 
-		for(uint8_t i = 0; i < 2; i++) {
-			sprite_draw(door_animation_sprites[i], sprite_shader_program, (uint8_t)(door_frame_timers[i] / 2));
-			glUniform1i(glGetUniformLocation(sprite_shader_program, "flip_x"), !i);
-		}
+		if(cam_state != CAM_STATE_OPENED) {
+			sprite_draw(fan_animation_sprite, sprite_shader_program, (uint8_t)fan_animation_frame);
 
-		for(uint8_t i = 0; i < 2; i++) {
-			sprite_draw(door_button_sprites[i], sprite_shader_program, (door_button_flags >> (2 * i)) & 0b11);
+			for(uint8_t i = 0; i < 2; i++) {
+				sprite_draw(door_animation_sprites[i], sprite_shader_program, (uint8_t)(door_frame_timers[i] / 2));
+				glUniform1i(glGetUniformLocation(sprite_shader_program, "flip_x"), !i);
+			}
+
+			for(uint8_t i = 0; i < 2; i++) {
+				sprite_draw(door_button_sprites[i], sprite_shader_program, (door_button_flags >> (2 * i)) & 0b11);
+			}
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -594,6 +609,28 @@ int main() {
 
 		sprite_draw(power_left_sprite, render_ui_shader_program, 0);
 		sprite_draw(power_left_percent_sprite, render_ui_shader_program, 0);
+
+		sprite_draw(night_text_sprite, render_ui_shader_program, 0);
+		sprite_draw(night_number_sprite, render_ui_shader_program, 0);
+
+		sprite_draw(hour_am_sprite, render_ui_shader_program, 0);
+
+		hour_timer += time_delta / 90.0f;
+		if(hour_timer >= 6.0f) {
+			/* TODO: Eventually add code to advance the night */
+			printf("Congratulations! You survived to 6 AM!\n");
+			glfwSetWindowShouldClose(window, 1);
+		}
+
+		if(hour_timer < 1.0f) {
+			for(uint8_t i = 0; i < 2; i++) {
+				sprite_set_position(&hour_number_sprite, (vec2){1161 - (!i * 24), 29});
+				sprite_draw(hour_number_sprite, render_ui_shader_program, i);
+			}
+		} else {
+			sprite_set_position(&hour_number_sprite, (vec2){1161, 29});
+			sprite_draw(hour_number_sprite, render_ui_shader_program, (uint8_t)hour_timer - 1);
+		}
 
 		{
 			uint8_t numbers_to_draw = (power_left_value >= 10.0f) + 1;
@@ -619,13 +656,21 @@ int main() {
 	/* destroy everything */
 	glDeleteFramebuffers(1, &fbo);
 
+	sprite_destroy(&night_number_sprite);
+	sprite_destroy(&night_text_sprite);
+	sprite_destroy(&hour_number_sprite);
+	sprite_destroy(&hour_am_sprite);
 	sprite_destroy(&cam_flip_animation_sprite);
+	sprite_destroy(&cam_flip_bar_sprite);
+	sprite_destroy(&power_left_number_sprite);
+	sprite_destroy(&power_left_percent_sprite);
+	sprite_destroy(&power_left_sprite);
+	sprite_destroy(&power_usage_text_sprite);
+	sprite_destroy(&power_usage_sprite);
 	sprite_destroy(&fan_animation_sprite);
 	sprite_destroy(&office_sprite);
-	sprite_destroy(door_button_sprites);
 	sprite_destroy(door_button_sprites + 1);
-	sprite_destroy(door_animation_sprites);
-	sprite_destroy(door_animation_sprites + 1);
+	sprite_destroy(door_button_sprites);
 
 	glDeleteShader(sprite_shader_program);
 	glDeleteShader(font_shader_program);

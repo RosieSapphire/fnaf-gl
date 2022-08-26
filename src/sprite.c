@@ -40,17 +40,18 @@ void sprite_create(sprite_t *sprite, vec2 pos, vec2 size, const char *path_forma
 		} c++;
 	}
 
-	texture_path_length = (uint8_t)(c - path_format - chars_excluded) + 2;
-	paths = calloc(texture_count * texture_path_length, sizeof(char));
+	texture_path_length = (uint8_t)(c - path_format - chars_excluded);
 	if(texture_count - 1) {
+		paths = calloc(texture_count * (texture_path_length + 6), sizeof(char));
 		for(uint16_t i = 0; i < texture_count; i++) {
 			const uint32_t offset = (i * texture_path_length);
 			sprintf(paths + offset, "%s%u.png", path_format, i);
-			sprite->textures[i] = texture_create(paths + offset, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR, 0);
+			sprite->textures[i] = texture_create(paths + offset, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
 		}
 	} else {
+		paths = calloc(texture_count * texture_path_length, sizeof(char));
 		sprintf(paths, "%s", path_format);
-		*sprite->textures = texture_create(paths, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR, 0);
+		*sprite->textures = texture_create(paths, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
 	}
 	free(paths);
 	sprite_set_position(sprite, pos);
