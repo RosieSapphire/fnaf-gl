@@ -6,76 +6,48 @@
 #include "file.h"
 
 uint32_t shader_create(const char *shader_vertex_path, const char *shader_fragment_path) {
-	char *shader_vertex_source;
-	char *shader_fragment_source;
-	uint32_t shader_vertex;
-	uint32_t shader_fragment;
-
+	const uint32_t shader_types[2] = {GL_VERTEX_SHADER, GL_FRAGMENT_SHADER};
+	const char *shader_paths[2] = {shader_vertex_path, shader_fragment_path};
+	#ifdef DEBUG
+		const char *shader_type_names[2] = {"Vertex", "Fragment"};
+	#endif
+	char *shader_sources[2];
+	uint32_t shaders[2];
 	uint32_t shader_program;
 
-	shader_vertex_source = file_load_contents(shader_vertex_path);
-	if(!shader_vertex_source) {
-		printf("ERROR: Vertex shader loading fucked up.\n");
-		return 0;
-	}
-
-	shader_fragment_source = file_load_contents(shader_fragment_path);
-	if(!shader_fragment_source) {
-		printf("ERROR: Fragment shader loading fucked up.\n");
-		return 0;
-	}
-
-	shader_vertex = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(shader_vertex, 1, (const char *const *)(&shader_vertex_source), NULL);
-	glCompileShader(shader_vertex);
-
-	{ /* check vertex shader errors */
-		int32_t success;
-		char info_log[512];
-		glGetShaderiv(shader_vertex, GL_COMPILE_STATUS, &success);
-		if(!success) {
-			glGetShaderInfoLog(shader_vertex, 512, NULL, info_log);
-			printf("ERROR: Vertex shader fucked up: %s\n", info_log);
-			return 1;
-		}
-	}
-
-	shader_fragment = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(shader_fragment, 1, (const char *const *)(&shader_fragment_source), NULL);
-	glCompileShader(shader_fragment);
-
-	{ /* check vertex shader errors */
-		int32_t success;
-		char info_log[512];
-		glGetShaderiv(shader_fragment, GL_COMPILE_STATUS, &success);
-		if(!success) {
-			glGetShaderInfoLog(shader_fragment, 512, NULL, info_log);
-			printf("ERROR: Fragment shader fucked up: %s\n", info_log);
-			return 1;
-		}
-	}
-
-	free(shader_fragment_source);
-	free(shader_vertex_source);
-
-	/* link office program */
 	shader_program = glCreateProgram();
-	glAttachShader(shader_program, shader_vertex);
-	glAttachShader(shader_program, shader_fragment);
-	glLinkProgram(shader_program);
+	for(uint8_t i = 0; i < 2; i++) {
+		#ifdef DEBUG
+			int32_t success;
+			char info_log[512];
+		#endif
+		shader_sources[i] = file_load_contents(shader_paths[i]);
+		#ifdef DEBUG
+			if(!shader_sources[i]) {
+				printf("ERROR: %s shader loading fucked up.\n", shader_type_names[i]);
+				return 0;
+			}
+		#endif
 
-	{ /* check shader program errors */
-		int32_t success;
-		char info_log[512];
-		glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
-		if(!success) {
-			glGetProgramInfoLog(shader_program, 512, NULL, info_log);
-			printf("ERROR: Shader program fucked up: %s\n", info_log);
-			return 1;
-		}
+		shaders[i] = glCreateShader(shader_types[i]);
+		glShaderSource(shaders[i], 1, (const char *const *)(&shader_sources[i]), NULL);
+		glCompileShader(shaders[i]);
+
+		#ifdef DEBUG
+			glGetShaderiv(shaders[i], GL_COMPILE_STATUS, &success);
+			if(!success) {
+				glGetShaderInfoLog(shaders[i], 512, NULL, info_log);
+				printf("ERROR: Vertex shader fucked up: %s\n", info_log);
+				return 0;
+			}
+		#endif
+
+		glAttachShader(shader_program, shaders[i]);
+		glDeleteShader(shaders[i]);
+		free(shader_sources[i]);
 	}
-	glDeleteShader(shader_fragment);
-	glDeleteShader(shader_vertex);
+
+	glLinkProgram(shader_program);
 
 	return shader_program;
 }
