@@ -510,7 +510,7 @@ int main() {
 			power_usage_value += ((door_button_flags >> (i * 2)) & 0x1) + ((((door_button_flags >> (i * 2)) & 0x2) > 0));
 		}
 
-		power_left_value -= ((float)power_usage_value + 1.0f) * time_delta * 0.1f;
+		power_left_value -= ((float)power_usage_value + 1.0f) * time_delta * 8.1f;
 
 		if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_RELEASE) {
 			mouse_has_clicked = 0;
@@ -595,9 +595,12 @@ int main() {
 		sprite_draw(power_left_sprite, render_ui_shader_program, 0);
 		sprite_draw(power_left_percent_sprite, render_ui_shader_program, 0);
 
-		for(uint8_t i = 0; i < 2; i++) {
-			sprite_set_position(&power_left_number_sprite, (vec2){203 - (i * 18), 624});
-			sprite_draw(power_left_number_sprite, render_ui_shader_program, (uint8_t)(power_left_value / powf(10, i)) % 10);
+		{
+			uint8_t numbers_to_draw = (power_left_value >= 10.0f) + 1;
+			for(uint8_t i = 0; i < numbers_to_draw; i++) {
+				sprite_set_position(&power_left_number_sprite, (vec2){203 - (i * 18), 624});
+				sprite_draw(power_left_number_sprite, render_ui_shader_program, (uint8_t)(power_left_value / powf(10, i)) % 10);
+			}
 		}
 
 		if((cam_state == CAM_STATE_CLOSED || cam_state == CAM_STATE_OPENED)) {
