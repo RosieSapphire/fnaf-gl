@@ -12,10 +12,12 @@ char *file_load_contents(const char *path) {
 	char *buffer;
 
 	file = fopen(path, "rb");
-    if(!file) {
-        printf("ERROR: File loading fucked up.\n");
-        return NULL;
-    }
+	#ifdef DEBUG
+   		if(!file) {
+   		    printf("ERROR: File loading fucked up.\n");
+   		    return NULL;
+   		}
+	#endif
 
     fseek(file, 0L, SEEK_END);
     size = (uint32_t)ftell(file);

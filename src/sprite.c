@@ -3,6 +3,7 @@
 
 #include <glad/glad.h>
 #include <stdarg.h>
+#include <assert.h>
 
 void sprite_create(sprite_t *sprite, vec2 pos, vec2 size, const char *path_format, const uint16_t texture_count) {
 	char *paths;
@@ -18,6 +19,11 @@ void sprite_create(sprite_t *sprite, vec2 pos, vec2 size, const char *path_forma
 		size[0],	size[1],	1.0f, 1.0f,
 		0.0f,		size[1], 	0.0f, 1.0f,
 	};
+
+	#ifdef DEBUG
+		assert(texture_count > 0);
+	#endif
+
 	glm_vec2_copy(size, sprite->size);
 
 	glGenVertexArrays(1, &sprite->vao);
@@ -32,7 +38,6 @@ void sprite_create(sprite_t *sprite, vec2 pos, vec2 size, const char *path_forma
 
 	sprite->textures = calloc(texture_count, sizeof(texture_t));
 	sprite->texture_count = texture_count;
-	
 	while(*c) {
 		if(*c == '%') {
 			chars_excluded++;
@@ -68,6 +73,9 @@ void sprite_set_position(sprite_t *sprite, vec2 position) {
 }
 
 void sprite_draw(sprite_t sprite, uint32_t shader, const uint16_t texture_index) {
+	#ifdef DEBUG
+		assert(texture_index < sprite.texture_count);
+	#endif
 	glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, (const GLfloat *)sprite.matrix);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, sprite.textures[texture_index]);

@@ -76,6 +76,7 @@ static float hour_timer = 0.0f;
 
 static sprite_t night_text_sprite;
 static sprite_t night_number_sprite;
+static uint8_t night_current = 1;
 
 static enum {
 	CAM_STATE_CLOSED = 0,
@@ -115,8 +116,7 @@ static uint32_t font_vao;
 static uint32_t font_vbo;
 static uint32_t font_shader_program;
 
-static float office_look_current = 0.0f;
-static uint8_t office_look_use_alternate = 0;
+static float office_look_current = 0.0f; static uint8_t office_look_use_alternate = 0;
 static uint8_t office_look_use_alternate_pressed = 0;
 
 static mat4 matrix_projection;
@@ -134,10 +134,15 @@ float clampf(const float x, const float min, const float max) {
 
 int main() {
 	/* load GLFW */
-	if(!glfwInit()) {
-		printf("ERROR: GLFW fucked up.\n");
-		return 1;
-	}
+	#ifdef DEBUG
+		if(!glfwInit()) {
+			printf("ERROR: GLFW fucked up.\n");
+			return 1;
+		}
+	#else
+		glfwInit();
+	#endif
+
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -145,20 +150,26 @@ int main() {
 
 	/* create window */
 	window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Five Nights at Freddy's", NULL, NULL);
-	if(!window) {
-		printf("ERROR: Window fucked up.\n");
-		return 1;
-	}
+	#ifdef DEBUG
+		if(!window) {
+			printf("ERROR: Window fucked up.\n");
+			return 1;
+		}
+	#endif
 
 	{ /* get monitor properties */
 		GLFWmonitor *monitor;
 		ivec2 monitor_size;
 		int32_t monitor_count;
 		monitor = *glfwGetMonitors(&monitor_count);
-		if(!monitor) {
-			printf("ERROR: Monitor fucked up.\n");
-			return 1;
-		}
+		#ifdef DEBUG
+			if(!monitor) {
+				printf("ERROR: Monitor fucked up.\n");
+				glfwDestroyWindow(window);
+				glfwTerminate();
+				return 1;
+			}
+		#endif
 
 		glfwGetMonitorWorkarea(monitor, NULL, NULL, &monitor_size[0], &monitor_size[1]);
 		glfwSetWindowPos(window, (monitor_size[0] / 2) - (WINDOW_WIDTH / 2), (monitor_size[1] / 2) - (WINDOW_HEIGHT / 2));
@@ -167,10 +178,17 @@ int main() {
 	glfwMakeContextCurrent(window);
 
 	/* load GLAD */
-	if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-		printf("ERROR: GLAD fucked up.\n");
-		return 1;
-	}
+	#ifdef DEBUG
+		if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+			printf("ERROR: GLAD fucked up.\n");
+			glfwDestroyWindow(window);
+			glfwTerminate();
+			return 1;
+		}
+	#else
+		gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+	#endif
+
 	glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
 	/* set up matricies */
@@ -209,31 +227,41 @@ int main() {
 	{ /* set up audio engine */
 		const char *sound_device_name;
 		sound_device = alcOpenDevice(NULL);
-		if(!sound_device) {
-		    printf("ERROR: Audio Device fucked up.");
-		    return 1;
-		}
+		#ifdef DEBUG
+			if(!sound_device) {
+			    printf("ERROR: Audio Device fucked up.");
+			    return 1;
+			}
+		#endif
 		
 		sound_context = alcCreateContext(sound_device, NULL);
-		if(!sound_context) {
-		    printf("ERROR: Audio Context fucked up.");
-		    return 1;
-		}
+		#ifdef DEBUG
+			if(!sound_context) {
+			    printf("ERROR: Audio Context fucked up.");
+			    return 1;
+			}
+		#endif
 		
+		#ifdef DEBUG
 		if(!alcMakeContextCurrent(sound_context)) {
 		    printf("ERROR: Making context fucked up.");
 		    return 1;
 		}
+		#else
+			alcMakeContextCurrent(sound_context);
+		#endif
 		
-		sound_device_name = NULL;
-		if(alcIsExtensionPresent(sound_device, "ALC_ENUMERATE_ALL_EXT")) {
-		    sound_device_name = alcGetString(sound_device, ALC_ALL_DEVICES_SPECIFIER);
-		}
-		
-		if(!sound_device_name || alcGetError(sound_device) != AL_NO_ERROR) {
-		    sound_device_name = alcGetString(sound_device, ALC_DEVICE_SPECIFIER);
-		}
-		printf("SOUND DEVICE: %s\n", sound_device_name);
+		#ifdef DEBUG
+			sound_device_name = NULL;
+			if(alcIsExtensionPresent(sound_device, "ALC_ENUMERATE_ALL_EXT")) {
+			    sound_device_name = alcGetString(sound_device, ALC_ALL_DEVICES_SPECIFIER);
+			}
+			
+			if(!sound_device_name || alcGetError(sound_device) != AL_NO_ERROR) {
+			    sound_device_name = alcGetString(sound_device, ALC_DEVICE_SPECIFIER);
+			}
+			printf("SOUND DEVICE: %s\n", sound_device_name);
+		#endif
 	}
 
 	/* load sounds */
@@ -344,10 +372,12 @@ int main() {
 	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, WINDOW_WIDTH, WINDOW_HEIGHT);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
 
-	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-		printf("ERROR: Framebuffer fucked up.\n");
-		return 1;
-	}
+	#ifdef DEBUG
+		if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+			printf("ERROR: Framebuffer fucked up.\n");
+			return 1;
+		}
+	#endif
 
 	{/* generate buffers for render texture */
 		uint32_t render_vbo;
@@ -611,7 +641,7 @@ int main() {
 		sprite_draw(power_left_percent_sprite, render_ui_shader_program, 0);
 
 		sprite_draw(night_text_sprite, render_ui_shader_program, 0);
-		sprite_draw(night_number_sprite, render_ui_shader_program, 0);
+		sprite_draw(night_number_sprite, render_ui_shader_program, night_current - 1);
 
 		sprite_draw(hour_am_sprite, render_ui_shader_program, 0);
 

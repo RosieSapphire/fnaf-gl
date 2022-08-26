@@ -15,7 +15,7 @@ release: $(BIN)
 release: CFLAGS += -O2 -Wall -Wextra -Weverything
 
 debug: $(BIN)
-debug: CFLAGS += -Og -g3 -Wall -Wextra -Weverything -Werror
+debug: CFLAGS += -Og -ggdb3 -Wall -Wextra -Weverything -Werror -D DEBUG
 
 run: release
 	clear

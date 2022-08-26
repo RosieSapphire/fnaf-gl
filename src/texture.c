@@ -25,10 +25,12 @@ texture_t texture_create(const char *path, const int32_t wrap_mode, const int32_
 
 	stbi_set_flip_vertically_on_load(1);
 	texture_data = stbi_load(path, &texture_width, &texture_height, &texture_format, 0);
-	if(!texture_data) {
-		printf("ERROR: Texture at: %s fucked up.\n", path);
-		return 255;
-	}
+	#ifdef DEBUG
+		if(!texture_data) {
+			printf("ERROR: Texture at: %s fucked up.\n", path);
+			return 255;
+		}
+	#endif
 
 	glTexImage2D(GL_TEXTURE_2D, 0, texture_format_enums[texture_format], texture_width, texture_height, 0, (uint32_t)texture_format_enums[texture_format], GL_UNSIGNED_BYTE, texture_data);
 	stbi_image_free(texture_data);
