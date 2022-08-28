@@ -7,9 +7,8 @@
 #include <sndfile.h>
 #include <limits.h>
 
-uint32_t sound_buffer_create(const char *path) {
-	uint32_t sound_buffer;
-
+sound_buffer_t sound_buffer_create(const char *path) {
+	sound_buffer_t sound_buffer;
 	SNDFILE *file;
 	SF_INFO file_info;
 	uint64_t frame_count;
@@ -84,14 +83,14 @@ uint32_t sound_buffer_create(const char *path) {
 	return sound_buffer;
 }
 
-uint32_t sound_source_create(int32_t sound_buffer, const float pitch, const float gain, const float *position, const uint8_t loop) {
+sound_source_t sound_source_create(sound_buffer_t sound_buffer, const float pitch, const float gain, const float *position, const uint8_t loop) {
 	uint32_t sound_source;
 	alGenSources(1, &sound_source); alSourcef(sound_source, AL_PITCH, pitch);
 	alSourcef(sound_source, AL_GAIN, gain);
 	alSourcefv(sound_source, AL_POSITION, position);
 	alSource3f(sound_source, AL_VELOCITY, 0.0f, 0.0f, 0.0f);
 	alSourcei(sound_source, AL_LOOPING, loop);
-	alSourcei(sound_source, AL_BUFFER, sound_buffer);
+	alSourcei(sound_source, AL_BUFFER, (int32_t)sound_buffer);
 
 	return sound_source;
 }

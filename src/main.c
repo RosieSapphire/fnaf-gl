@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -11,13 +12,10 @@
 #include "file.h"
 #include "texture.h"
 #include "sprite.h"
+#include "sound.h"
 #include "shader.h"
 #include "mouse.h"
-
-#include "sound.h"
-
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include "helpers.h"
 
 #define WINDOW_WIDTH					1280
 #define WINDOW_HEIGHT					720
@@ -26,6 +24,7 @@
 
 #define DOOR_BUTTON_LIGHT_FLAG			0x1
 #define DOOR_BUTTON_DOOR_FLAG			0x2
+#define DOOR_BUTTON_BOTH_DOORS_FLAG 	0xA
 
 #define CAM_TIMER_INIT 					0.35f
 
@@ -48,90 +47,65 @@ static uint32_t render_ui_shader_program;
 
 /* sprites and textures */
 static sprite_t office_sprite;
-
 static sprite_t fan_animation_sprite;
-static float fan_animation_frame = 0.0f;
-
 static sprite_t door_button_sprites[2];
-static uint8_t door_button_flags = 0;
-
 static sprite_t door_animation_sprites[2];
-static float door_frame_timers[2] = {0.0f};
-
-static uint32_t sprite_shader_program;
-static uint8_t office_sprite_state = 0;
-
 static sprite_t power_usage_sprite;
-static uint8_t power_usage_value;
 static sprite_t power_usage_text_sprite;
-
 static sprite_t power_left_sprite;
 static sprite_t power_left_percent_sprite;
 static sprite_t power_left_number_sprite;
-static float power_left_value = 99.9f;
-
 static sprite_t hour_am_sprite;
 static sprite_t hour_number_sprite;
-static float hour_timer = 0.0f;
-
 static sprite_t night_text_sprite;
 static sprite_t night_number_sprite;
-static uint8_t night_current = 1;
+static sprite_t cam_flip_bar_sprite;
+static sprite_t cam_flip_animation_sprite;
 
-static enum {
+enum {
 	CAM_STATE_CLOSED = 0,
 	CAM_STATE_OPENING,
 	CAM_STATE_OPENED,
 	CAM_STATE_CLOSING
 };
 
-static sprite_t cam_flip_bar_sprite;
-static sprite_t cam_flip_animation_sprite;
+static uint32_t sprite_shader_program;
+static uint8_t office_sprite_state = 0;
+static uint8_t night_current = 1;
+static uint8_t door_button_flags = 0;
+static uint8_t power_usage_value;
+static float fan_animation_frame = 0.0f;
+static float door_frame_timers[2] = {0.0f};
+static float power_left_value = 99.9f;
+static float hour_timer = 0.0f;
 static uint8_t cam_bar_hovering = 0;
 static uint8_t cam_state = CAM_STATE_CLOSED;
 static float cam_flip_timer = CAM_TIMER_INIT;
 
 /* sound sources */
-static uint32_t fan_sound_source;
-static uint32_t light_sound_source;
-static uint32_t door_sound_source;
-static uint32_t freddy_nose_sound_source;
+static sound_buffer_t fan_sound_buffer;
+static sound_buffer_t light_sound_buffer;
+static sound_buffer_t door_sound_buffer;
+static sound_buffer_t freddy_nose_sound_buffer;
+static sound_buffer_t cam_open_sound_buffer;
+static sound_buffer_t cam_scan_sound_buffer;
+static sound_buffer_t cam_close_sound_buffer;
+static sound_buffer_t cam_blip_sound_buffer;
 
-static uint32_t cam_open_sound_source;
-static uint32_t cam_scan_sound_source;
-static uint32_t cam_close_sound_source;
-static uint32_t cam_blip_sound_source;
-
-static uint32_t fan_sound_buffer;
-static uint32_t light_sound_buffer;
-static uint32_t door_sound_buffer;
-static uint32_t freddy_nose_sound_buffer;
-
-static uint32_t cam_open_sound_buffer;
-static uint32_t cam_scan_sound_buffer;
-static uint32_t cam_close_sound_buffer;
-static uint32_t cam_blip_sound_buffer;
-
-static uint32_t font_vao;
-static uint32_t font_vbo;
-static uint32_t font_shader_program;
+static sound_source_t fan_sound_source;
+static sound_source_t light_sound_source;
+static sound_source_t door_sound_source;
+static sound_source_t freddy_nose_sound_source;
+static sound_source_t cam_open_sound_source;
+static sound_source_t cam_scan_sound_source;
+static sound_source_t cam_close_sound_source;
+static sound_source_t cam_blip_sound_source;
 
 static float office_look_current = 0.0f;
 static uint8_t office_look_use_alternate = 0;
 static uint8_t office_look_use_alternate_pressed = 0;
 
 static mat4 matrix_projection;
-static mat4 matrix_view;
-
-float clampf(const float x, const float min, const float max) {
-    float diff[2] = {min-x, x-max};
-    uint32_t MemA = *(uint32_t*)&diff[0];
-    uint32_t MemB = *(uint32_t*)&diff[1];
-    uint8_t Flag_A = (MemA>>31);
-    uint8_t Flag_B = (MemB>>31);
-    uint8_t OOR = (Flag_A & Flag_B);
-    return (OOR * x) + ((1-Flag_A) * min) + ((1-Flag_B) * max);
-}
 
 int main() {
 	/* load GLFW */
@@ -194,39 +168,38 @@ int main() {
 
 	/* set up matricies */
 	glm_ortho(0.0f, WINDOW_WIDTH, 0.0f, WINDOW_HEIGHT, -1.0f, 1.0f, matrix_projection);
-	glm_mat4_copy(GLM_MAT4_IDENTITY, matrix_view);
 
 	/* create shaders */
 	render_shader_program = shader_create("resources/shaders/render_vertex.glsl", "resources/shaders/render_fragment.glsl");
 	render_ui_shader_program = shader_create("resources/shaders/render_ui_vertex.glsl", "resources/shaders/render_ui_fragment.glsl");
-	font_shader_program = shader_create("resources/shaders/font_vertex.glsl", "resources/shaders/font_fragment.glsl");
 	sprite_shader_program = shader_create("resources/shaders/sprite_vertex.glsl", "resources/shaders/sprite_fragment.glsl");
 
 	{ /* load sprites */
-		const vec2 door_positions[2] = {{72.0f, -1.0f}, {1270.0f, -2.0f}};
+		vec2 door_positions[2] = {{72.0f, -1.0f}, {1270.0f, -2.0f}};
+		sprite_create(&office_sprite, GLM_VEC2_ZERO, (vec2){1600.0f, 720.0f}, "resources/graphics/office/states/", 5);
+		sprite_create(&fan_animation_sprite, (vec2){780.0f, 303.0f}, (vec2){137.0f, 196.0f}, "resources/graphics/office/fan/", 3);
+		sprite_create(&door_button_sprites[0], (vec2){6.0f, 263.0f}, (vec2){92.0f, 247.0f}, "resources/graphics/office/doors/buttons/l", 4);
+		sprite_create(&door_button_sprites[1], (vec2){1497.0f, 273.0f}, (vec2){92.0f, 247.0f}, "resources/graphics/office/doors/buttons/r", 4);
 		for(uint8_t i = 0; i < 2; i++) {
 			sprite_create(&door_animation_sprites[i], door_positions[i], (vec2){223.0f, 720.0f}, "resources/graphics/office/doors/", 15);
 		}
-
-		sprite_create(&door_button_sprites[0], (vec2){6.0f, 263.0f}, (vec2){92.0f, 247.0f}, "resources/graphics/office/doors/buttons/l", 4);
-		sprite_create(&door_button_sprites[1], (vec2){1497.0f, 273.0f}, (vec2){92.0f, 247.0f}, "resources/graphics/office/doors/buttons/r", 4);
-		sprite_create(&office_sprite, GLM_VEC2_ZERO, (vec2){1600.0f, 720.0f}, "resources/graphics/office/states/", 5);
-		sprite_create(&fan_animation_sprite, (vec2){780.0f, 303.0f}, (vec2){137.0f, 196.0f}, "resources/graphics/office/fan/", 3);
 		sprite_create(&power_usage_sprite, (vec2){120, 657}, (vec2){103, 32}, "resources/graphics/office/ui/power/levels/", 4);
 		sprite_create(&power_usage_text_sprite, (vec2){38, 667}, (vec2){72, 14}, "resources/graphics/office/ui/power/usage.png", 1);
 		sprite_create(&power_left_sprite, (vec2){38, 631}, (vec2){137, 14}, "resources/graphics/office/ui/power/power-left-0.png", 1);
 		sprite_create(&power_left_percent_sprite, (vec2){228, 632}, (vec2){11, 14}, "resources/graphics/office/ui/power/power-left-1.png", 1);
 		sprite_create(&power_left_number_sprite, GLM_VEC2_ZERO, (vec2){18, 22}, "resources/graphics/office/ui/power/numbers/", 10);
-		sprite_create(&cam_flip_bar_sprite, (vec2){255, 638}, (vec2){600, 60}, "resources/graphics/office/ui/camera/bar.png", 1);
-		sprite_create(&cam_flip_animation_sprite, GLM_VEC2_ZERO, (vec2){1280, 720}, "resources/graphics/office/ui/camera/flip/", 11);
 		sprite_create(&hour_am_sprite, (vec2){1200, 31}, (vec2){42, 26}, "resources/graphics/office/ui/am.png", 1);
 		sprite_create(&hour_number_sprite, (vec2){1161, 29}, (vec2){24, 30}, "resources/graphics/office/ui/hour/", 6);
 		sprite_create(&night_text_sprite, (vec2){1148, 74}, (vec2){63, 14}, "resources/graphics/office/ui/night/night.png", 1);
 		sprite_create(&night_number_sprite, (vec2){1223, 72}, (vec2){14, 17}, "resources/graphics/office/ui/night/", 7);
+		sprite_create(&cam_flip_bar_sprite, (vec2){255, 638}, (vec2){600, 60}, "resources/graphics/office/ui/camera/bar.png", 1);
+		sprite_create(&cam_flip_animation_sprite, GLM_VEC2_ZERO, (vec2){1280, 720}, "resources/graphics/office/ui/camera/flip/", 11);
 	}
 
 	{ /* set up audio engine */
-		const char *sound_device_name;
+		#ifdef DEBUG
+			const char *sound_device_name;
+		#endif
 		sound_device = alcOpenDevice(NULL);
 		#ifdef DEBUG
 			if(!sound_device) {
@@ -293,60 +266,6 @@ int main() {
 	/* set up audio listener */
 	alListeneri(AL_DISTANCE_MODEL, AL_INVERSE_DISTANCE_CLAMPED);
 
-	/*
-	{
-		FT_Library freetype;
-		FT_Face freetype_face;
-		if(FT_Init_FreeType(&freetype)) {
-			printf("ERROR: Freetype fucked up.\n");
-			return 1;
-		}
-
-		if(FT_New_Face(freetype, "resources/fonts/main.ttf", 0, &freetype_face)) {
-			printf("ERROR: Freetype Face fucked up.\n");
-			return 1;
-		}
-
-		FT_Set_Pixel_Sizes(freetype_face, 0, 48);
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
-		for(uint8_t c = 0; c < 128; c++) {
-			uint32_t glyph_texture;
-			if(FT_Load_Char(freetype_face, c, FT_LOAD_RENDER)) {
-				printf("ERROR: Freetype fucked up loading a char.\n");
-				continue;
-			}
-
-			glGenTextures(1, &glyph_texture);
-			glBindTexture(GL_TEXTURE_2D, glyph_texture);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, freetype_face->glyph->bitmap.width, freetype_face->glyph->bitmap.rows, 0, GL_RED, GL_UNSIGNED_BYTE, freetype_face->glyph->bitmap.buffer);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-			glyphs[c].texture_id = glyph_texture;
-			glm_ivec2_copy((ivec2){freetype_face->glyph->bitmap.width, freetype_face->glyph->bitmap.rows}, glyphs[c].size);
-			glm_ivec2_copy((ivec2){freetype_face->glyph->bitmap_left, freetype_face->glyph->bitmap_top}, glyphs[c].bearing);
-			glyphs[c].advance = freetype_face->glyph->advance.x;
-		}
-		glBindTexture(GL_TEXTURE_2D, 0);
-		FT_Done_Face(freetype_face);
-		FT_Done_FreeType(freetype);
-	}
-	*/
-
-	/* generate freetype buffers */
-	glGenVertexArrays(1, &font_vao);
-	glGenBuffers(1, &font_vbo);
-	glBindVertexArray(font_vao);
-	glBindBuffer(GL_ARRAY_BUFFER, font_vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
-
 	/* enable random shit */
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
@@ -410,15 +329,16 @@ int main() {
 	alSourcePlay(light_sound_source);
 
 	/* main loop */
-	srand(time(NULL));
+	srand((uint32_t)time(NULL));
 	while(!glfwWindowShouldClose(window)) {
 		ivec2 mouse_position;
+		mat4 matrix_view;
 
 		/* calculate deltatime */
 		double time_now;
 		float time_delta;
 		time_now = glfwGetTime();
-		time_delta = time_now - time_last;
+		time_delta = (float)(time_now - time_last);
 		time_last = time_now;
 
 		/* process input */
@@ -440,9 +360,7 @@ int main() {
 		if(cam_state != CAM_STATE_OPENED) {
 			if(!office_look_use_alternate) {
 				/* default room turning */
-				float mouse_distance_from_center;
-				mouse_distance_from_center = mouse_position[0] - (WINDOW_WIDTH / 2.0f);
-
+				float mouse_distance_from_center = (float)mouse_position[0] - (WINDOW_WIDTH / 2.0f);
 				mouse_distance_from_center = clampf(mouse_distance_from_center, -640.0f, 640.0f);
 				mouse_distance_from_center *= !(fabsf(mouse_distance_from_center) < 128.0f);
 
@@ -500,7 +418,7 @@ int main() {
 			}
 
 			if(cam_state == CAM_STATE_OPENED && cam_state_old != CAM_STATE_OPENED) {
-				door_button_flags &= 0b1010;
+				door_button_flags &= DOOR_BUTTON_BOTH_DOORS_FLAG;
 				alSourcePlay(cam_blip_sound_source);
 			}
 		}
@@ -513,7 +431,7 @@ int main() {
 			if(cam_state != CAM_STATE_OPENED) {
 				const ivec4 door_button_boxes[4] = {{27, 89, 251, 371}, {1519, 1581, 267, 387}, {25, 87, 393, 513}, {1519, 1581, 398, 518}};
 				for(uint8_t i = 0; i < 2; i++) {
-					uint8_t door_button_bit_mask = (DOOR_BUTTON_DOOR_FLAG << (i * 2));
+					uint8_t door_button_bit_mask = (uint8_t)(DOOR_BUTTON_DOOR_FLAG << (i * 2));
 					if(!((uint8_t)door_frame_timers[i]) || (uint8_t)door_frame_timers[i] == 28) {
 						if(mouse_inside_box(window, door_button_boxes[i], mouse_offset)) {
 							door_button_flags ^= door_button_bit_mask;
@@ -579,7 +497,7 @@ int main() {
 			if(scaled_update_timer > ANIMATION_FRAMETIME) {
 				/* light flicker effect */
 				float light_buzz_volume_new = 0.0f;
-				uint8_t light_random = rand() % 10;
+				uint8_t light_random = (uint8_t)(rand() % 10);
 				office_sprite_state = 0;
 				for(uint8_t i = 0; i < 2; i++) {
 					if(door_button_flags & (DOOR_BUTTON_LIGHT_FLAG << (i * 2))) {
@@ -617,7 +535,7 @@ int main() {
 			}
 
 			for(uint8_t i = 0; i < 2; i++) {
-				sprite_draw(door_button_sprites[i], sprite_shader_program, (door_button_flags >> (2 * i)) & 0b11);
+				sprite_draw(door_button_sprites[i], sprite_shader_program, (door_button_flags >> (2 * i)) & 0x3);
 			}
 		}
 
@@ -688,24 +606,25 @@ int main() {
 	/* destroy everything */
 	glDeleteFramebuffers(1, &fbo);
 
+	sprite_destroy(&cam_flip_animation_sprite);
+	sprite_destroy(&cam_flip_bar_sprite);
 	sprite_destroy(&night_number_sprite);
 	sprite_destroy(&night_text_sprite);
 	sprite_destroy(&hour_number_sprite);
 	sprite_destroy(&hour_am_sprite);
-	sprite_destroy(&cam_flip_animation_sprite);
-	sprite_destroy(&cam_flip_bar_sprite);
 	sprite_destroy(&power_left_number_sprite);
 	sprite_destroy(&power_left_percent_sprite);
 	sprite_destroy(&power_left_sprite);
 	sprite_destroy(&power_usage_text_sprite);
 	sprite_destroy(&power_usage_sprite);
+	for(uint8_t i = 0; i < 2; i++) {
+		sprite_destroy(&door_button_sprites[i]);
+		sprite_destroy(&door_animation_sprites[i]);
+	}
 	sprite_destroy(&fan_animation_sprite);
 	sprite_destroy(&office_sprite);
-	sprite_destroy(door_button_sprites + 1);
-	sprite_destroy(door_button_sprites);
 
 	glDeleteShader(sprite_shader_program);
-	glDeleteShader(font_shader_program);
 	glDeleteShader(render_ui_shader_program);
 	glDeleteShader(render_shader_program);
 

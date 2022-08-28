@@ -37,7 +37,7 @@ First we need to compile CGLM from source, since it doesn't seem to work with th
 git clone https://github.com/resc/cglm.git
 cd cglm
 mkdir build && cd build
-cmake .. -DCGLM_SHARED=OFF -DCGLM_USE_C99=ON
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCGLM_USE_C99=ON
 sudo make install
 ```
 

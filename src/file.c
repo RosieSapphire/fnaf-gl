@@ -6,7 +6,6 @@
 #include <GLFW/glfw3.h>
 
 char *file_load_contents(const char *path) {
-	uint32_t i;
 	uint32_t size;
 	FILE *file;
 	char *buffer;
@@ -24,9 +23,7 @@ char *file_load_contents(const char *path) {
     rewind(file);
 
     buffer = malloc(size * sizeof(GLchar));
-    for(i = 0; i < size; i++) {
-        buffer[i] = (char)fgetc(file);
-    }
+	fread(buffer, sizeof(uint8_t), size, file);
     buffer[size - 1] = '\0';
 
     fclose(file);
