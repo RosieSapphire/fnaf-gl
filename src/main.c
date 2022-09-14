@@ -326,6 +326,7 @@ int main() {
 	}
 
 	alSourcePlay(fan_sound_source);
+	alSourcef(fan_sound_source, AL_GAIN, 0.25f);
 	alSourcePlay(light_sound_source);
 
 	/* main loop */
@@ -390,6 +391,7 @@ int main() {
 							alSourceStop(cam_close_sound_source);
 							alSourcePlay(cam_open_sound_source);
 							alSourcePlay(cam_scan_sound_source);
+
 							break;
 
 						case CAM_STATE_OPENED:
@@ -397,6 +399,8 @@ int main() {
 							alSourceStop(cam_open_sound_source);
 							alSourceStop(cam_scan_sound_source);
 							alSourcePlay(cam_close_sound_source);
+
+							alSourcef(fan_sound_source, AL_GAIN, 0.25f);
 							break;
 
 						default:
@@ -420,6 +424,7 @@ int main() {
 			if(cam_state == CAM_STATE_OPENED && cam_state_old != CAM_STATE_OPENED) {
 				door_button_flags &= DOOR_BUTTON_BOTH_DOORS_FLAG;
 				alSourcePlay(cam_blip_sound_source);
+				alSourcef(fan_sound_source, AL_GAIN, 0.1f);
 			}
 		}
 

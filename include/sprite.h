@@ -11,7 +11,7 @@ typedef struct {
 	uint64_t padding0;
 	mat4 matrix;
 	vec2 size;
-	texture_t* textures;
+	texture_t *textures;
 	uint16_t texture_count;
 	uint16_t padding3;
 	uint32_t padding2;
