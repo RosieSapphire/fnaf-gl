@@ -105,6 +105,10 @@ static float office_look_current = 0.0f;
 static uint8_t office_look_use_alternate = 0;
 static uint8_t office_look_use_alternate_pressed = 0;
 
+static float camera_look_current = 0.0f;
+static float camera_look_hold_timer = 0.0f;
+static uint8_t camera_look_state = 0;
+
 static mat4 matrix_projection;
 
 int main() {
@@ -428,6 +432,29 @@ int main() {
 			}
 		}
 
+		{ /* camera moving */
+			/* TODO: Maybe optimize this bullshit */
+			if(camera_look_hold_timer > 0.0f) {
+				camera_look_hold_timer -= time_delta;
+			} else {
+				if(camera_look_state) {
+					camera_look_current += time_delta * 60.0f;
+					if(camera_look_current > 0.0f) {
+						camera_look_current = 0.0f;
+						camera_look_hold_timer = 1.6666667f;
+						camera_look_state = !camera_look_state;
+					}
+				} else {
+					camera_look_current -= time_delta * 60.0f;
+					if(camera_look_current < -320.0f) {
+						camera_look_current = -320.0f;
+						camera_look_hold_timer = 1.6666667f;
+						camera_look_state = !camera_look_state;
+					}
+				}
+			}
+		}
+
 		/* check for clicking door buttons */
 		if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS && !mouse_has_clicked) {
 			const uint8_t door_button_flags_old = door_button_flags;
@@ -516,7 +543,7 @@ int main() {
 		}
 
 		glm_mat4_copy(GLM_MAT4_IDENTITY, matrix_view);
-		glm_translate(matrix_view, (vec3){office_look_current, 0.0f, 0.0f});
+		glm_translate(matrix_view, (vec3){(cam_state == CAM_STATE_OPENED) ? camera_look_current : office_look_current, 0.0f, 0.0f});
 
 		/* draw */
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
