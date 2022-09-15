@@ -11,13 +11,13 @@ void sprite_create(sprite_t *sprite, vec2 pos, vec2 size, const char *path_forma
 	uint8_t chars_excluded = 0;
 	const char *c = path_format;
 	const float vertices[] = {
-		0.0f,		0.0f,		0.0f, 0.0f,
-		size[0],	0.0f,		1.0f, 0.0f,
-		size[0],	size[1],	1.0f, 1.0f,
+		0.0f,	0.0f,	0.0f, 0.0f,
+		1.0f,	0.0f,	1.0f, 0.0f,
+		1.0f,	1.0f,	1.0f, 1.0f,
 
-		0.0f,		0.0f,		0.0f, 0.0f,
-		size[0],	size[1],	1.0f, 1.0f,
-		0.0f,		size[1], 	0.0f, 1.0f,
+		0.0f,	0.0f,	0.0f, 0.0f,
+		1.0f,	1.0f,	1.0f, 1.0f,
+		0.0f,	1.0f, 	0.0f, 1.0f,
 	};
 
 	#ifdef DEBUG
@@ -59,24 +59,25 @@ void sprite_create(sprite_t *sprite, vec2 pos, vec2 size, const char *path_forma
 		*sprite->textures = texture_create(paths, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
 	}
 	free(paths);
-	sprite_set_position(sprite, pos);
-}
-
-void sprite_set_position(sprite_t *sprite, vec2 position) {
-	vec3 position_converted;
-	position_converted[0] = position[0];
-	position_converted[1] = 720 - position[1] - sprite->size[1];
-	position_converted[2] = 0.0f;
-
-	glm_mat4_copy(GLM_MAT4_IDENTITY, sprite->matrix);
-	glm_translate(sprite->matrix, position_converted);
+	glm_vec2_copy(pos, sprite->position);
 }
 
 void sprite_draw(sprite_t sprite, uint32_t shader, const uint16_t texture_index) {
+	mat4 sprite_matrix;
+	vec3 position_converted;
+
 	#ifdef DEBUG
 		assert(texture_index < sprite.texture_count);
 	#endif
-	glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, (const GLfloat *)sprite.matrix);
+
+	position_converted[0] = sprite.position[0];
+	position_converted[1] = 720 - sprite.position[1] - sprite.size[1];
+	position_converted[2] = 0.0f;
+
+	glm_mat4_identity(sprite_matrix);
+	glm_translate(sprite_matrix, position_converted);
+	glm_scale(sprite_matrix, (vec3){sprite.size[0], sprite.size[1], 0.0f});
+	glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, (const GLfloat *)sprite_matrix);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, sprite.textures[texture_index]);
 	glBindVertexArray(sprite.vao);

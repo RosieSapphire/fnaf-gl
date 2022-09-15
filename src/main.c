@@ -48,6 +48,7 @@ static uint32_t ui_shader_program;
 /* sprites and textures */
 static sprite_t office_view_sprite;
 static sprite_t camera_view_sprite;
+static sprite_t camera_view_name_sprite;
 static sprite_t fan_animation_sprite;
 static sprite_t door_button_sprites[2];
 static sprite_t door_animation_sprites[2];
@@ -69,6 +70,9 @@ static sprite_t camera_recording_sprite;
 
 static sprite_t camera_button_sprite;
 static sprite_t camera_button_name_sprite;
+
+static sprite_t blip_animation_sprite;
+static uint8_t blip_animation_frame = 0;
 
 static sprite_t static_animation_sprite;
 static uint8_t static_animation_frame = 0;
@@ -117,7 +121,7 @@ static sound_source_t camera_close_sound_source;
 static sound_source_t camera_blip_sound_source;
 
 static float office_look_current = 0.0f;
-static uint8_t space_pressed = 0;
+// static uint8_t space_pressed = 0;
 
 static float camera_look_current = 0.0f;
 static float camera_look_hold_timer = 0.0f;
@@ -196,6 +200,7 @@ int main() {
 		vec2 door_positions[2] = {{72.0f, -1.0f}, {1270.0f, -2.0f}};
 		sprite_create(&office_view_sprite, GLM_VEC2_ZERO, (vec2){1600.0f, 720.0f}, "resources/graphics/office/states/", 5);
 		sprite_create(&camera_view_sprite, GLM_VEC2_ZERO, (vec2){1600.0f, 720.0f}, "resources/graphics/camera/", 85);
+		sprite_create(&camera_view_name_sprite, (vec2){832.0f, 292.0f}, (vec2){239.0f, 26.0f}, "resources/graphics/ui/camera/map/names/", 11);
 		sprite_create(&fan_animation_sprite, (vec2){780.0f, 303.0f}, (vec2){137.0f, 196.0f}, "resources/graphics/office/fan/", 3);
 		sprite_create(&door_button_sprites[0], (vec2){6.0f, 263.0f}, (vec2){92.0f, 247.0f}, "resources/graphics/office/doors/buttons/l", 4);
 		sprite_create(&door_button_sprites[1], (vec2){1497.0f, 273.0f}, (vec2){92.0f, 247.0f}, "resources/graphics/office/doors/buttons/r", 4);
@@ -221,6 +226,8 @@ int main() {
 		sprite_create(&camera_button_name_sprite, GLM_VEC2_ZERO, (vec2){31.0f, 25.0f}, "resources/graphics/ui/camera/map/button/text/", 11);
 
 		sprite_create(&static_animation_sprite, GLM_VEC2_ZERO, (vec2){1280.0f, 720.0f}, "resources/graphics/general/static/", 8);
+
+		sprite_create(&blip_animation_sprite, GLM_VEC2_ZERO, (vec2){1280.0f, 720.0f}, "resources/graphics/general/blip/", 9);
 	}
 
 	{ /* set up audio engine */
@@ -388,6 +395,7 @@ int main() {
 			glfwSetWindowShouldClose(window, 1);
 		}
 
+		/*
 		if(glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !space_pressed) {
 			camera_selected++;
 			camera_selected %= 11;
@@ -398,6 +406,7 @@ int main() {
 		if(glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE) {
 			space_pressed = 0;
 		}
+		*/
 
 		/* use the appropriate room scroll setting */
 		mouse_get_position(window, mouse_position);
@@ -466,6 +475,7 @@ int main() {
 			if(camera_state == CAM_STATE_OPENED && camera_state_old != CAM_STATE_OPENED) {
 				door_button_flags &= DOOR_BUTTON_BOTH_DOORS_FLAG;
 				alSourcePlay(camera_blip_sound_source);
+				blip_animation_frame = 0;
 				alSourcef(fan_sound_source, AL_GAIN, 0.1f);
 			}
 		}
@@ -528,6 +538,7 @@ int main() {
 
 					if(mouse_inside_box(window, camera_button_box_current, 0.0f)) {
 						alSourcePlay(camera_blip_sound_source);
+						blip_animation_frame = 0;
 						camera_selected = i;
 					}
 				}
@@ -592,6 +603,9 @@ int main() {
 					}
 				}
 
+				if(blip_animation_frame < 9)
+					blip_animation_frame++;
+
 				/* static animation flicker */
 				do {
 					static_animation_frame = (uint8_t)rand() % 8;
@@ -609,7 +623,7 @@ int main() {
 			}
 		}
 
-		glm_mat4_copy(GLM_MAT4_IDENTITY, matrix_view);
+		glm_mat4_identity(matrix_view);
 		glm_translate(matrix_view, (vec3){(camera_state == CAM_STATE_OPENED) ? camera_look_current : office_look_current, 0.0f, 0.0f});
 
 		/* draw */
@@ -659,6 +673,7 @@ int main() {
 		if(camera_state == CAM_STATE_OPENED) {
 			uint8_t blink_state;
 			float blink_timer = fmod2((float)time_now * 0.4166667f, 1.0f);
+			const float camera_view_name_widths[11] = { 217.0f, 239.0f, 228.0f, 192.0f, 305.0f, 284.0f, 192.0f, 305.0f, 195.0f, 151.0f, 196.0f };
 	
 			blink_state = blink_timer < 0.5f;
 
@@ -666,17 +681,23 @@ int main() {
 			sprite_draw(static_animation_sprite, ui_shader_program, static_animation_frame);
 			glUniform1f(glGetUniformLocation(ui_shader_program, "alpha"), 1.0f);
 
+			if(blip_animation_frame < 9)
+				sprite_draw(blip_animation_sprite, ui_shader_program, blip_animation_frame);
+
 			sprite_draw(camera_border_sprite, ui_shader_program, 0);
 			sprite_draw(camera_map_sprite, ui_shader_program, blink_state);
+
+			camera_view_name_sprite.size[0] = camera_view_name_widths[camera_selected];
+			sprite_draw(camera_view_name_sprite, ui_shader_program, camera_selected);
 
 			for(uint8_t i = 0; i < 11; i++) {
 				vec2 camera_button_position_current;
 				glm_vec3_sub(camera_button_positions[i], (vec2){29.0f, 19.0f}, camera_button_position_current);
-				sprite_set_position(&camera_button_sprite, camera_button_position_current);
+				glm_vec2_copy(camera_button_position_current, camera_button_sprite.position);
 				sprite_draw(camera_button_sprite, ui_shader_program, blink_state * (camera_selected == i));
 
 				glm_vec3_sub(camera_button_positions[i], (vec2){22.0f, 12.0f}, camera_button_position_current);
-				sprite_set_position(&camera_button_name_sprite, camera_button_position_current);
+				glm_vec2_copy(camera_button_position_current, camera_button_name_sprite.position);
 				sprite_draw(camera_button_name_sprite, ui_shader_program, i);
 			}
 
@@ -704,18 +725,18 @@ int main() {
 
 		if(hour_timer < 1.0f) {
 			for(uint8_t i = 0; i < 2; i++) {
-				sprite_set_position(&hour_number_sprite, (vec2){1161 - (!i * 24), 29});
+				glm_vec2_copy((vec2){1161 - (!i * 24), 29}, hour_number_sprite.position);
 				sprite_draw(hour_number_sprite, ui_shader_program, i);
 			}
 		} else {
-			sprite_set_position(&hour_number_sprite, (vec2){1161, 29});
+			glm_vec2_copy((vec2){1161, 29}, hour_number_sprite.position);
 			sprite_draw(hour_number_sprite, ui_shader_program, (uint8_t)hour_timer - 1);
 		}
 
 		{
 			uint8_t numbers_to_draw = (power_left_value >= 10.0f) + 1;
 			for(uint8_t i = 0; i < numbers_to_draw; i++) {
-				sprite_set_position(&power_left_number_sprite, (vec2){203 - (i * 18), 624});
+				glm_vec2_copy((vec2){203 - (i * 18), 624}, power_left_number_sprite.position);
 				sprite_draw(power_left_number_sprite, ui_shader_program, (uint8_t)(power_left_value / powf(10, i)) % 10);
 			}
 		}
@@ -734,6 +755,8 @@ int main() {
 
 	/* destroy everything */
 	glDeleteFramebuffers(1, &fbo);
+
+	sprite_destroy(&blip_animation_sprite);
 
 	sprite_destroy(&static_animation_sprite);
 
@@ -758,6 +781,7 @@ int main() {
 		sprite_destroy(&door_animation_sprites[i]);
 	}
 	sprite_destroy(&fan_animation_sprite);
+	sprite_destroy(&camera_view_name_sprite);
 	sprite_destroy(&camera_view_sprite);
 	sprite_destroy(&office_view_sprite);
 
