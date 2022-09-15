@@ -67,6 +67,9 @@ static sprite_t camera_border_sprite;
 static sprite_t camera_map_sprite;
 static sprite_t camera_recording_sprite;
 
+static sprite_t camera_button_sprite;
+static sprite_t camera_button_name_sprite;
+
 static sprite_t static_animation_sprite;
 static uint8_t static_animation_frame = 0;
 static uint8_t static_animation_rand_timer = 60;
@@ -114,8 +117,7 @@ static sound_source_t camera_close_sound_source;
 static sound_source_t camera_blip_sound_source;
 
 static float office_look_current = 0.0f;
-static uint8_t office_look_use_alternate = 0;
-static uint8_t office_look_use_alternate_pressed = 0;
+static uint8_t space_pressed = 0;
 
 static float camera_look_current = 0.0f;
 static float camera_look_hold_timer = 0.0f;
@@ -215,6 +217,8 @@ int main() {
 		sprite_create(&camera_border_sprite, GLM_VEC2_ZERO, (vec2){1280, 720}, "resources/graphics/ui/camera/border.png", 1);
 		sprite_create(&camera_map_sprite, (vec2){848.0f, 313.0f}, (vec2){400.0f, 400.0f}, "resources/graphics/ui/camera/map/", 2);
 		sprite_create(&camera_recording_sprite, (vec2){68.0f, 52.0f}, (vec2){50.0f, 50.0f}, "resources/graphics/ui/camera/recording-dot.png", 1);
+		sprite_create(&camera_button_sprite, GLM_VEC2_ZERO, (vec2){60.0f, 40.0f}, "resources/graphics/ui/camera/map/button/", 2);
+		sprite_create(&camera_button_name_sprite, GLM_VEC2_ZERO, (vec2){31.0f, 25.0f}, "resources/graphics/ui/camera/map/button/text/", 11);
 
 		sprite_create(&static_animation_sprite, GLM_VEC2_ZERO, (vec2){1280.0f, 720.0f}, "resources/graphics/general/static/", 8);
 	}
@@ -370,35 +374,36 @@ int main() {
 			glfwSetWindowShouldClose(window, 1);
 		}
 
-		if(glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !office_look_use_alternate_pressed) {
-			office_look_use_alternate ^= 1;
-			office_look_use_alternate_pressed = 1;
+		if(glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !space_pressed) {
+			camera_selected++;
+			camera_selected %= 10;
+			alSourcePlay(camera_blip_sound_source);
+			space_pressed = 1;
 		}
 
 		if(glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE) {
-			office_look_use_alternate_pressed = 0;
+			space_pressed = 0;
 		}
 
 		/* use the appropriate room scroll setting */
 		mouse_get_position(window, mouse_position);
 		if(camera_state != CAM_STATE_OPENED) {
-			if(!office_look_use_alternate) {
-				/* default room turning */
-				float mouse_distance_from_center = (float)mouse_position[0] - (WINDOW_WIDTH / 2.0f);
-				mouse_distance_from_center = clampf(mouse_distance_from_center, -640.0f, 640.0f);
-				mouse_distance_from_center *= !(fabsf(mouse_distance_from_center) < 128.0f);
+			/* default room turning */
+			float mouse_distance_from_center = (float)mouse_position[0] - (WINDOW_WIDTH / 2.0f);
+			mouse_distance_from_center = clampf(mouse_distance_from_center, -640.0f, 640.0f);
+			mouse_distance_from_center *= !(fabsf(mouse_distance_from_center) < 128.0f);
 
-				office_look_current += -mouse_distance_from_center * time_delta;
-				office_look_current = clampf(office_look_current, -320.0f, 0.0f);
-			} else {
-				/* custom room turning */
-				float office_look_target;
-				float mouse_normalized_x = (float)mouse_position[0] / (float)WINDOW_WIDTH;
+			office_look_current += -mouse_distance_from_center * time_delta;
+			office_look_current = clampf(office_look_current, -320.0f, 0.0f);
+			/*
+			// custom room turning
+			float office_look_target;
+			float mouse_normalized_x = (float)mouse_position[0] / (float)WINDOW_WIDTH;
 
-				mouse_normalized_x = clampf(mouse_normalized_x, 0.0f, 1.0f);
-				office_look_target = mouse_normalized_x * -320;
-				office_look_current += (office_look_target - office_look_current) * time_delta * 8.0f;
-			}
+			mouse_normalized_x = clampf(mouse_normalized_x, 0.0f, 1.0f);
+			office_look_target = mouse_normalized_x * -320;
+			office_look_current += (office_look_target - office_look_current) * time_delta * 8.0f;
+			*/
 		}
 
 		/* camera flipping */
@@ -603,7 +608,8 @@ int main() {
 				sprite_draw(door_button_sprites[i], sprite_shader_program, (door_button_flags >> (2 * i)) & 0x3);
 			}
 		} else {
-			sprite_draw(camera_view_sprite, sprite_shader_program, camera_selected);
+			const uint8_t camera_selected_offsets[] = { 0, 7, 13, 18, 54, 60, 62, 68, 77, 81 };
+			sprite_draw(camera_view_sprite, sprite_shader_program, camera_selected_offsets[camera_selected]);
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -625,13 +631,40 @@ int main() {
 		if(camera_state == CAM_STATE_OPENED) {
 			uint8_t blink_state;
 			float blink_timer = fmod2((float)time_now * 0.4166667f, 1.0f);
+	
+			vec2 camera_button_positions[11] = {
+				{983.0f, 353.0f},
+				{963.0f, 409.0f},
+				{931.0f, 487.0f},
+				{983.0f, 603.0f},
+				{983.0f, 643.0f},
+				{899.0f, 585.0f},
+				{1089.0f, 604.0f},
+				{1089.0f, 644.0f},
+				{857.0f, 436.0f},
+				{1186.0f, 568.0f},
+				{1195.0f, 437.0f},
+			};
+
 			blink_state = blink_timer < 0.5f;
-			sprite_draw(camera_border_sprite, ui_shader_program, 0);
-			sprite_draw(camera_map_sprite, ui_shader_program, blink_state);
 
 			glUniform1f(glGetUniformLocation(ui_shader_program, "alpha"), static_animation_alpha);
 			sprite_draw(static_animation_sprite, ui_shader_program, static_animation_frame);
 			glUniform1f(glGetUniformLocation(ui_shader_program, "alpha"), 1.0f);
+
+			sprite_draw(camera_border_sprite, ui_shader_program, 0);
+			sprite_draw(camera_map_sprite, ui_shader_program, blink_state);
+
+			for(uint8_t i = 0; i < 11; i++) {
+				vec2 camera_button_position_current;
+				glm_vec3_sub(camera_button_positions[i], (vec2){29.0f, 19.0f}, camera_button_position_current);
+				sprite_set_position(&camera_button_sprite, camera_button_position_current);
+				sprite_draw(camera_button_sprite, ui_shader_program, 0);
+
+				glm_vec3_sub(camera_button_positions[i], (vec2){22.0f, 12.0f}, camera_button_position_current);
+				sprite_set_position(&camera_button_name_sprite, camera_button_position_current);
+				sprite_draw(camera_button_name_sprite, ui_shader_program, i);
+			}
 
 			if(blink_state)
 				sprite_draw(camera_recording_sprite, ui_shader_program, 0);
@@ -690,6 +723,7 @@ int main() {
 
 	sprite_destroy(&static_animation_sprite);
 
+	sprite_destroy(&camera_button_sprite);
 	sprite_destroy(&camera_recording_sprite);
 	sprite_destroy(&camera_map_sprite);
 	sprite_destroy(&camera_border_sprite);
