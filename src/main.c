@@ -43,7 +43,7 @@ static double time_last;
 
 static uint32_t render_texture;
 static uint32_t render_shader_program;
-static uint32_t render_ui_shader_program;
+static uint32_t ui_shader_program;
 
 /* sprites and textures */
 static sprite_t office_view_sprite;
@@ -66,6 +66,12 @@ static sprite_t camera_flip_animation_sprite;
 static sprite_t camera_border_sprite;
 static sprite_t camera_map_sprite;
 static sprite_t camera_recording_sprite;
+
+static sprite_t static_animation_sprite;
+static uint8_t static_animation_frame = 0;
+static uint8_t static_animation_rand_timer = 60;
+static uint8_t static_animation_rand_value = 0;
+static float static_animation_alpha = 0.0f;
 
 enum {
 	CAM_STATE_CLOSED = 0,
@@ -181,7 +187,7 @@ int main() {
 
 	/* create shaders */
 	render_shader_program = shader_create("resources/shaders/render_vertex.glsl", "resources/shaders/render_fragment.glsl");
-	render_ui_shader_program = shader_create("resources/shaders/render_ui_vertex.glsl", "resources/shaders/render_ui_fragment.glsl");
+	ui_shader_program = shader_create("resources/shaders/render_ui_vertex.glsl", "resources/shaders/render_ui_fragment.glsl");
 	sprite_shader_program = shader_create("resources/shaders/sprite_vertex.glsl", "resources/shaders/sprite_fragment.glsl");
 
 	{ /* load sprites */
@@ -209,6 +215,8 @@ int main() {
 		sprite_create(&camera_border_sprite, GLM_VEC2_ZERO, (vec2){1280, 720}, "resources/graphics/ui/camera/border.png", 1);
 		sprite_create(&camera_map_sprite, (vec2){848.0f, 313.0f}, (vec2){400.0f, 400.0f}, "resources/graphics/ui/camera/map/", 2);
 		sprite_create(&camera_recording_sprite, (vec2){68.0f, 52.0f}, (vec2){50.0f, 50.0f}, "resources/graphics/ui/camera/recording-dot.png", 1);
+
+		sprite_create(&static_animation_sprite, GLM_VEC2_ZERO, (vec2){1280.0f, 720.0f}, "resources/graphics/general/static/", 8);
 	}
 
 	{ /* set up audio engine */
@@ -538,6 +546,8 @@ int main() {
 
 			scaled_update_timer += time_delta;
 			if(scaled_update_timer > ANIMATION_FRAMETIME) {
+				const uint8_t static_animation_frame_old = static_animation_frame;
+
 				/* light flicker effect */
 				float light_buzz_volume_new = 0.0f;
 				uint8_t light_random = (uint8_t)(rand() % 10);
@@ -548,6 +558,19 @@ int main() {
 						light_buzz_volume_new = clampf((float)light_random, 0.0f, 1.0f);
 					}
 				}
+
+				/* static animation flicker */
+				do {
+					static_animation_frame = (uint8_t)rand() % 8;
+				} while(static_animation_frame == static_animation_frame_old);
+
+				static_animation_rand_timer--;
+				if(static_animation_rand_timer == 0xFF) {
+					static_animation_rand_value = ((uint8_t)rand() % 3) * 15;
+					static_animation_rand_timer = 60;
+				}
+				static_animation_alpha = 1.0f - ((150.0f + (rand() % 50) + static_animation_rand_value) / 255.0f);
+
 				alSourcef(light_sound_source, AL_GAIN, light_buzz_volume_new);
 				scaled_update_timer = 0.0f;
 			}
@@ -595,31 +618,35 @@ int main() {
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		/* ui elements */
-		glUseProgram(render_ui_shader_program);
-		glUniformMatrix4fv(glGetUniformLocation(render_ui_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
+		glUseProgram(ui_shader_program);
+		glUniformMatrix4fv(glGetUniformLocation(ui_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
+		glUniform1f(glGetUniformLocation(ui_shader_program, "alpha"), 1.0f);
 
 		if(camera_state == CAM_STATE_OPENED) {
 			uint8_t blink_state;
-			float blink_timer = (float)time_now * 0.4166667f;
-			blink_timer -= (float)((int32_t)blink_timer);
+			float blink_timer = fmod2((float)time_now * 0.4166667f, 1.0f);
 			blink_state = blink_timer < 0.5f;
-			sprite_draw(camera_border_sprite, render_ui_shader_program, 0);
-			sprite_draw(camera_map_sprite, render_ui_shader_program, blink_state);
+			sprite_draw(camera_border_sprite, ui_shader_program, 0);
+			sprite_draw(camera_map_sprite, ui_shader_program, blink_state);
+
+			glUniform1f(glGetUniformLocation(ui_shader_program, "alpha"), static_animation_alpha);
+			sprite_draw(static_animation_sprite, ui_shader_program, static_animation_frame);
+			glUniform1f(glGetUniformLocation(ui_shader_program, "alpha"), 1.0f);
 
 			if(blink_state)
-				sprite_draw(camera_recording_sprite, render_ui_shader_program, 0);
+				sprite_draw(camera_recording_sprite, ui_shader_program, 0);
 		}
 
-		sprite_draw(power_usage_text_sprite, render_ui_shader_program, 0);
-		sprite_draw(power_usage_sprite, render_ui_shader_program, power_usage_value);
+		sprite_draw(power_usage_text_sprite, ui_shader_program, 0);
+		sprite_draw(power_usage_sprite, ui_shader_program, power_usage_value);
 
-		sprite_draw(power_left_sprite, render_ui_shader_program, 0);
-		sprite_draw(power_left_percent_sprite, render_ui_shader_program, 0);
+		sprite_draw(power_left_sprite, ui_shader_program, 0);
+		sprite_draw(power_left_percent_sprite, ui_shader_program, 0);
 
-		sprite_draw(night_text_sprite, render_ui_shader_program, 0);
-		sprite_draw(night_number_sprite, render_ui_shader_program, night_current - 1);
+		sprite_draw(night_text_sprite, ui_shader_program, 0);
+		sprite_draw(night_number_sprite, ui_shader_program, night_current - 1);
 
-		sprite_draw(hour_am_sprite, render_ui_shader_program, 0);
+		sprite_draw(hour_am_sprite, ui_shader_program, 0);
 
 		hour_timer += time_delta / 90.0f;
 		if(hour_timer >= 6.0f) {
@@ -631,29 +658,28 @@ int main() {
 		if(hour_timer < 1.0f) {
 			for(uint8_t i = 0; i < 2; i++) {
 				sprite_set_position(&hour_number_sprite, (vec2){1161 - (!i * 24), 29});
-				sprite_draw(hour_number_sprite, render_ui_shader_program, i);
+				sprite_draw(hour_number_sprite, ui_shader_program, i);
 			}
 		} else {
 			sprite_set_position(&hour_number_sprite, (vec2){1161, 29});
-			sprite_draw(hour_number_sprite, render_ui_shader_program, (uint8_t)hour_timer - 1);
+			sprite_draw(hour_number_sprite, ui_shader_program, (uint8_t)hour_timer - 1);
 		}
 
 		{
 			uint8_t numbers_to_draw = (power_left_value >= 10.0f) + 1;
 			for(uint8_t i = 0; i < numbers_to_draw; i++) {
 				sprite_set_position(&power_left_number_sprite, (vec2){203 - (i * 18), 624});
-				sprite_draw(power_left_number_sprite, render_ui_shader_program, (uint8_t)(power_left_value / powf(10, i)) % 10);
+				sprite_draw(power_left_number_sprite, ui_shader_program, (uint8_t)(power_left_value / powf(10, i)) % 10);
 			}
 		}
 
 		if((camera_state == CAM_STATE_CLOSED || camera_state == CAM_STATE_OPENED)) {
 			if(!camera_bar_hovering) {
-				sprite_draw(camera_flip_bar_sprite, render_ui_shader_program, 0);
+				sprite_draw(camera_flip_bar_sprite, ui_shader_program, 0);
 			}
 		} else {
-			sprite_draw(camera_flip_animation_sprite, render_ui_shader_program, (uint16_t)(fabsf((10.0f * (camera_state == CAM_STATE_OPENING)) - ((camera_flip_timer * (1 / CAM_TIMER_INIT)) * 10.0f))));
+			sprite_draw(camera_flip_animation_sprite, ui_shader_program, (uint16_t)(fabsf((10.0f * (camera_state == CAM_STATE_OPENING)) - ((camera_flip_timer * (1 / CAM_TIMER_INIT)) * 10.0f))));
 		}
-
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -661,6 +687,8 @@ int main() {
 
 	/* destroy everything */
 	glDeleteFramebuffers(1, &fbo);
+
+	sprite_destroy(&static_animation_sprite);
 
 	sprite_destroy(&camera_recording_sprite);
 	sprite_destroy(&camera_map_sprite);
@@ -686,7 +714,7 @@ int main() {
 	sprite_destroy(&office_view_sprite);
 
 	glDeleteShader(sprite_shader_program);
-	glDeleteShader(render_ui_shader_program);
+	glDeleteShader(ui_shader_program);
 	glDeleteShader(render_shader_program);
 
 	alDeleteSources(8, &fan_sound_source);
