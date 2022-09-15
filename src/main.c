@@ -359,6 +359,20 @@ int main() {
 	/* main loop */
 	srand((uint32_t)time(NULL));
 	while(!glfwWindowShouldClose(window)) {
+		vec2 camera_button_positions[11] = {
+			{983.0f, 353.0f},
+			{963.0f, 409.0f},
+			{931.0f, 487.0f},
+			{983.0f, 603.0f},
+			{983.0f, 643.0f},
+			{899.0f, 585.0f},
+			{1089.0f, 604.0f},
+			{1089.0f, 644.0f},
+			{857.0f, 436.0f},
+			{1186.0f, 568.0f},
+			{1195.0f, 437.0f},
+		};
+
 		ivec2 mouse_position;
 		mat4 matrix_view;
 
@@ -376,7 +390,7 @@ int main() {
 
 		if(glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !space_pressed) {
 			camera_selected++;
-			camera_selected %= 10;
+			camera_selected %= 11;
 			alSourcePlay(camera_blip_sound_source);
 			space_pressed = 1;
 		}
@@ -503,6 +517,20 @@ int main() {
 					alSourceStop(freddy_nose_sound_source);
 					alSourcePlay(freddy_nose_sound_source);
 				}
+			} else {
+				/* selecting different cameras */
+				for(uint8_t i = 0; i < 11; i++) {
+					ivec4 camera_button_box_current;
+					for(uint8_t j = 0; j < 4; j++) {
+						camera_button_box_current[j] = (int32_t)camera_button_positions[i][(int32_t)((float)j / 2.0f)];
+					}
+					glm_ivec4_sub(camera_button_box_current, (ivec4){29, -31, 19, -21}, camera_button_box_current);
+
+					if(mouse_inside_box(window, camera_button_box_current, 0.0f)) {
+						alSourcePlay(camera_blip_sound_source);
+						camera_selected = i;
+					}
+				}
 			}
 
 			/* handle cases where both lights are toggled */
@@ -608,7 +636,7 @@ int main() {
 				sprite_draw(door_button_sprites[i], sprite_shader_program, (door_button_flags >> (2 * i)) & 0x3);
 			}
 		} else {
-			const uint8_t camera_selected_offsets[] = { 0, 7, 13, 18, 54, 60, 62, 68, 77, 81 };
+			const uint8_t camera_selected_offsets[11] = { 0, 7, 13, 18, 54, 60, 62, 68, 77, 255, 81 };
 			sprite_draw(camera_view_sprite, sprite_shader_program, camera_selected_offsets[camera_selected]);
 		}
 
@@ -632,20 +660,6 @@ int main() {
 			uint8_t blink_state;
 			float blink_timer = fmod2((float)time_now * 0.4166667f, 1.0f);
 	
-			vec2 camera_button_positions[11] = {
-				{983.0f, 353.0f},
-				{963.0f, 409.0f},
-				{931.0f, 487.0f},
-				{983.0f, 603.0f},
-				{983.0f, 643.0f},
-				{899.0f, 585.0f},
-				{1089.0f, 604.0f},
-				{1089.0f, 644.0f},
-				{857.0f, 436.0f},
-				{1186.0f, 568.0f},
-				{1195.0f, 437.0f},
-			};
-
 			blink_state = blink_timer < 0.5f;
 
 			glUniform1f(glGetUniformLocation(ui_shader_program, "alpha"), static_animation_alpha);
@@ -659,7 +673,7 @@ int main() {
 				vec2 camera_button_position_current;
 				glm_vec3_sub(camera_button_positions[i], (vec2){29.0f, 19.0f}, camera_button_position_current);
 				sprite_set_position(&camera_button_sprite, camera_button_position_current);
-				sprite_draw(camera_button_sprite, ui_shader_program, 0);
+				sprite_draw(camera_button_sprite, ui_shader_program, blink_state * (camera_selected == i));
 
 				glm_vec3_sub(camera_button_positions[i], (vec2){22.0f, 12.0f}, camera_button_position_current);
 				sprite_set_position(&camera_button_name_sprite, camera_button_position_current);
