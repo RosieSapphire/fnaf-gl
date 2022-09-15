@@ -46,7 +46,8 @@ static uint32_t render_shader_program;
 static uint32_t render_ui_shader_program;
 
 /* sprites and textures */
-static sprite_t office_sprite;
+static sprite_t office_view_sprite;
+static sprite_t camera_view_sprite;
 static sprite_t fan_animation_sprite;
 static sprite_t door_button_sprites[2];
 static sprite_t door_animation_sprites[2];
@@ -59,8 +60,12 @@ static sprite_t hour_am_sprite;
 static sprite_t hour_number_sprite;
 static sprite_t night_text_sprite;
 static sprite_t night_number_sprite;
-static sprite_t cam_flip_bar_sprite;
-static sprite_t cam_flip_animation_sprite;
+static sprite_t camera_flip_bar_sprite;
+static sprite_t camera_flip_animation_sprite;
+
+static sprite_t camera_border_sprite;
+static sprite_t camera_map_sprite;
+static sprite_t camera_recording_sprite;
 
 enum {
 	CAM_STATE_CLOSED = 0,
@@ -70,7 +75,7 @@ enum {
 };
 
 static uint32_t sprite_shader_program;
-static uint8_t office_sprite_state = 0;
+static uint8_t office_view_sprite_state = 0;
 static uint8_t night_current = 1;
 static uint8_t door_button_flags = 0;
 static uint8_t power_usage_value;
@@ -78,28 +83,29 @@ static float fan_animation_frame = 0.0f;
 static float door_frame_timers[2] = {0.0f};
 static float power_left_value = 99.9f;
 static float hour_timer = 0.0f;
-static uint8_t cam_bar_hovering = 0;
-static uint8_t cam_state = CAM_STATE_CLOSED;
-static float cam_flip_timer = CAM_TIMER_INIT;
+static uint8_t camera_bar_hovering = 0;
+static uint8_t camera_state = CAM_STATE_CLOSED;
+static uint8_t camera_selected = 0;
+static float camera_flip_timer = CAM_TIMER_INIT;
 
 /* sound sources */
 static sound_buffer_t fan_sound_buffer;
 static sound_buffer_t light_sound_buffer;
 static sound_buffer_t door_sound_buffer;
 static sound_buffer_t freddy_nose_sound_buffer;
-static sound_buffer_t cam_open_sound_buffer;
-static sound_buffer_t cam_scan_sound_buffer;
-static sound_buffer_t cam_close_sound_buffer;
-static sound_buffer_t cam_blip_sound_buffer;
+static sound_buffer_t camera_open_sound_buffer;
+static sound_buffer_t camera_scan_sound_buffer;
+static sound_buffer_t camera_close_sound_buffer;
+static sound_buffer_t camera_blip_sound_buffer;
 
 static sound_source_t fan_sound_source;
 static sound_source_t light_sound_source;
 static sound_source_t door_sound_source;
 static sound_source_t freddy_nose_sound_source;
-static sound_source_t cam_open_sound_source;
-static sound_source_t cam_scan_sound_source;
-static sound_source_t cam_close_sound_source;
-static sound_source_t cam_blip_sound_source;
+static sound_source_t camera_open_sound_source;
+static sound_source_t camera_scan_sound_source;
+static sound_source_t camera_close_sound_source;
+static sound_source_t camera_blip_sound_source;
 
 static float office_look_current = 0.0f;
 static uint8_t office_look_use_alternate = 0;
@@ -180,24 +186,29 @@ int main() {
 
 	{ /* load sprites */
 		vec2 door_positions[2] = {{72.0f, -1.0f}, {1270.0f, -2.0f}};
-		sprite_create(&office_sprite, GLM_VEC2_ZERO, (vec2){1600.0f, 720.0f}, "resources/graphics/office/states/", 5);
+		sprite_create(&office_view_sprite, GLM_VEC2_ZERO, (vec2){1600.0f, 720.0f}, "resources/graphics/office/states/", 5);
+		sprite_create(&camera_view_sprite, GLM_VEC2_ZERO, (vec2){1600.0f, 720.0f}, "resources/graphics/camera/", 85);
 		sprite_create(&fan_animation_sprite, (vec2){780.0f, 303.0f}, (vec2){137.0f, 196.0f}, "resources/graphics/office/fan/", 3);
 		sprite_create(&door_button_sprites[0], (vec2){6.0f, 263.0f}, (vec2){92.0f, 247.0f}, "resources/graphics/office/doors/buttons/l", 4);
 		sprite_create(&door_button_sprites[1], (vec2){1497.0f, 273.0f}, (vec2){92.0f, 247.0f}, "resources/graphics/office/doors/buttons/r", 4);
 		for(uint8_t i = 0; i < 2; i++) {
 			sprite_create(&door_animation_sprites[i], door_positions[i], (vec2){223.0f, 720.0f}, "resources/graphics/office/doors/", 15);
 		}
-		sprite_create(&power_usage_sprite, (vec2){120, 657}, (vec2){103, 32}, "resources/graphics/office/ui/power/levels/", 4);
-		sprite_create(&power_usage_text_sprite, (vec2){38, 667}, (vec2){72, 14}, "resources/graphics/office/ui/power/usage.png", 1);
-		sprite_create(&power_left_sprite, (vec2){38, 631}, (vec2){137, 14}, "resources/graphics/office/ui/power/power-left-0.png", 1);
-		sprite_create(&power_left_percent_sprite, (vec2){228, 632}, (vec2){11, 14}, "resources/graphics/office/ui/power/power-left-1.png", 1);
-		sprite_create(&power_left_number_sprite, GLM_VEC2_ZERO, (vec2){18, 22}, "resources/graphics/office/ui/power/numbers/", 10);
-		sprite_create(&hour_am_sprite, (vec2){1200, 31}, (vec2){42, 26}, "resources/graphics/office/ui/am.png", 1);
-		sprite_create(&hour_number_sprite, (vec2){1161, 29}, (vec2){24, 30}, "resources/graphics/office/ui/hour/", 6);
-		sprite_create(&night_text_sprite, (vec2){1148, 74}, (vec2){63, 14}, "resources/graphics/office/ui/night/night.png", 1);
-		sprite_create(&night_number_sprite, (vec2){1223, 72}, (vec2){14, 17}, "resources/graphics/office/ui/night/", 7);
-		sprite_create(&cam_flip_bar_sprite, (vec2){255, 638}, (vec2){600, 60}, "resources/graphics/office/ui/camera/bar.png", 1);
-		sprite_create(&cam_flip_animation_sprite, GLM_VEC2_ZERO, (vec2){1280, 720}, "resources/graphics/office/ui/camera/flip/", 11);
+		sprite_create(&power_usage_sprite, (vec2){120, 657}, (vec2){103, 32}, "resources/graphics/ui/power/levels/", 4);
+		sprite_create(&power_usage_text_sprite, (vec2){38, 667}, (vec2){72, 14}, "resources/graphics/ui/power/usage.png", 1);
+		sprite_create(&power_left_sprite, (vec2){38, 631}, (vec2){137, 14}, "resources/graphics/ui/power/power-left-0.png", 1);
+		sprite_create(&power_left_percent_sprite, (vec2){228, 632}, (vec2){11, 14}, "resources/graphics/ui/power/power-left-1.png", 1);
+		sprite_create(&power_left_number_sprite, GLM_VEC2_ZERO, (vec2){18, 22}, "resources/graphics/ui/power/numbers/", 10);
+		sprite_create(&hour_am_sprite, (vec2){1200, 31}, (vec2){42, 26}, "resources/graphics/ui/am.png", 1);
+		sprite_create(&hour_number_sprite, (vec2){1161, 29}, (vec2){24, 30}, "resources/graphics/ui/hour/", 6);
+		sprite_create(&night_text_sprite, (vec2){1148, 74}, (vec2){63, 14}, "resources/graphics/ui/night/night.png", 1);
+		sprite_create(&night_number_sprite, (vec2){1223, 72}, (vec2){14, 17}, "resources/graphics/ui/night/", 7);
+		sprite_create(&camera_flip_bar_sprite, (vec2){255, 638}, (vec2){600, 60}, "resources/graphics/ui/camera/bar.png", 1);
+		sprite_create(&camera_flip_animation_sprite, GLM_VEC2_ZERO, (vec2){1280, 720}, "resources/graphics/ui/camera/flip/", 11);
+
+		sprite_create(&camera_border_sprite, GLM_VEC2_ZERO, (vec2){1280, 720}, "resources/graphics/ui/camera/border.png", 1);
+		sprite_create(&camera_map_sprite, (vec2){848.0f, 313.0f}, (vec2){400.0f, 400.0f}, "resources/graphics/ui/camera/map/", 2);
+		sprite_create(&camera_recording_sprite, (vec2){68.0f, 52.0f}, (vec2){50.0f, 50.0f}, "resources/graphics/ui/camera/recording-dot.png", 1);
 	}
 
 	{ /* set up audio engine */
@@ -255,17 +266,17 @@ int main() {
 	freddy_nose_sound_buffer = sound_buffer_create("resources/audio/sounds/boop.wav");
 	freddy_nose_sound_source = sound_source_create(freddy_nose_sound_buffer, 1.0f, 0.4f, GLM_VEC3_ZERO, 0);
 
-	cam_open_sound_buffer = sound_buffer_create("resources/audio/sounds/cam-open.wav");
-	cam_open_sound_source = sound_source_create(cam_open_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
+	camera_open_sound_buffer = sound_buffer_create("resources/audio/sounds/cam-open.wav");
+	camera_open_sound_source = sound_source_create(camera_open_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
 
-	cam_scan_sound_buffer = sound_buffer_create("resources/audio/sounds/cam-scan.wav");
-	cam_scan_sound_source = sound_source_create(cam_scan_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
+	camera_scan_sound_buffer = sound_buffer_create("resources/audio/sounds/cam-scan.wav");
+	camera_scan_sound_source = sound_source_create(camera_scan_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
 
-	cam_close_sound_buffer = sound_buffer_create("resources/audio/sounds/cam-close.wav");
-	cam_close_sound_source = sound_source_create(cam_close_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
+	camera_close_sound_buffer = sound_buffer_create("resources/audio/sounds/cam-close.wav");
+	camera_close_sound_source = sound_source_create(camera_close_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
 
-	cam_blip_sound_buffer = sound_buffer_create("resources/audio/sounds/blip.wav");
-	cam_blip_sound_source = sound_source_create(cam_blip_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
+	camera_blip_sound_buffer = sound_buffer_create("resources/audio/sounds/blip.wav");
+	camera_blip_sound_source = sound_source_create(camera_blip_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
 
 	/* set up audio listener */
 	alListeneri(AL_DISTANCE_MODEL, AL_INVERSE_DISTANCE_CLAMPED);
@@ -362,7 +373,7 @@ int main() {
 
 		/* use the appropriate room scroll setting */
 		mouse_get_position(window, mouse_position);
-		if(cam_state != CAM_STATE_OPENED) {
+		if(camera_state != CAM_STATE_OPENED) {
 			if(!office_look_use_alternate) {
 				/* default room turning */
 				float mouse_distance_from_center = (float)mouse_position[0] - (WINDOW_WIDTH / 2.0f);
@@ -384,25 +395,25 @@ int main() {
 
 		/* camera flipping */
 		{
-			const uint8_t cam_state_old = cam_state;
+			const uint8_t camera_state_old = camera_state;
 			if(mouse_inside_box(window, (ivec4){75, 75 + 792, 653, 653 + 67}, 0.0f)) {
-				if(!cam_bar_hovering) {
-					cam_bar_hovering = 1;
+				if(!camera_bar_hovering) {
+					camera_bar_hovering = 1;
 
-					switch(cam_state) {
+					switch(camera_state) {
 						case CAM_STATE_CLOSED:
-							cam_state = CAM_STATE_OPENING;
-							alSourceStop(cam_close_sound_source);
-							alSourcePlay(cam_open_sound_source);
-							alSourcePlay(cam_scan_sound_source);
+							camera_state = CAM_STATE_OPENING;
+							alSourceStop(camera_close_sound_source);
+							alSourcePlay(camera_open_sound_source);
+							alSourcePlay(camera_scan_sound_source);
 
 							break;
 
 						case CAM_STATE_OPENED:
-							cam_state = CAM_STATE_CLOSING;
-							alSourceStop(cam_open_sound_source);
-							alSourceStop(cam_scan_sound_source);
-							alSourcePlay(cam_close_sound_source);
+							camera_state = CAM_STATE_CLOSING;
+							alSourceStop(camera_open_sound_source);
+							alSourceStop(camera_scan_sound_source);
+							alSourcePlay(camera_close_sound_source);
 
 							alSourcef(fan_sound_source, AL_GAIN, 0.25f);
 							break;
@@ -413,21 +424,21 @@ int main() {
 				}
 			}
 
-			cam_bar_hovering *= !(mouse_position[1] < 643.0);
+			camera_bar_hovering *= !(mouse_position[1] < 643.0);
 
-			if(cam_state == CAM_STATE_OPENING || cam_state == CAM_STATE_CLOSING) {
-				if(cam_flip_timer > 0.0f) {
-					cam_flip_timer -= time_delta;
+			if(camera_state == CAM_STATE_OPENING || camera_state == CAM_STATE_CLOSING) {
+				if(camera_flip_timer > 0.0f) {
+					camera_flip_timer -= time_delta;
 				} else {
-					cam_state++;
-					cam_state %= 4;
-					cam_flip_timer = CAM_TIMER_INIT;
+					camera_state++;
+					camera_state %= 4;
+					camera_flip_timer = CAM_TIMER_INIT;
 				}
 			}
 
-			if(cam_state == CAM_STATE_OPENED && cam_state_old != CAM_STATE_OPENED) {
+			if(camera_state == CAM_STATE_OPENED && camera_state_old != CAM_STATE_OPENED) {
 				door_button_flags &= DOOR_BUTTON_BOTH_DOORS_FLAG;
-				alSourcePlay(cam_blip_sound_source);
+				alSourcePlay(camera_blip_sound_source);
 				alSourcef(fan_sound_source, AL_GAIN, 0.1f);
 			}
 		}
@@ -460,7 +471,7 @@ int main() {
 			const uint8_t door_button_flags_old = door_button_flags;
 			const int32_t mouse_offset = (int32_t)office_look_current;
 
-			if(cam_state != CAM_STATE_OPENED) {
+			if(camera_state != CAM_STATE_OPENED) {
 				const ivec4 door_button_boxes[4] = {{27, 89, 251, 371}, {1519, 1581, 267, 387}, {25, 87, 393, 513}, {1519, 1581, 398, 518}};
 				for(uint8_t i = 0; i < 2; i++) {
 					uint8_t door_button_bit_mask = (uint8_t)(DOOR_BUTTON_DOOR_FLAG << (i * 2));
@@ -502,7 +513,7 @@ int main() {
 		for(uint8_t i = 0; i < 2; i++) {
 			power_usage_value += ((door_button_flags >> (i * 2)) & 0x1) + ((((door_button_flags >> (i * 2)) & 0x2) > 0));
 		}
-		power_usage_value += cam_state == CAM_STATE_OPENED;
+		power_usage_value += camera_state == CAM_STATE_OPENED;
 
 		power_left_value -= ((float)power_usage_value + 1.0f) * time_delta * 0.1f;
 
@@ -530,10 +541,10 @@ int main() {
 				/* light flicker effect */
 				float light_buzz_volume_new = 0.0f;
 				uint8_t light_random = (uint8_t)(rand() % 10);
-				office_sprite_state = 0;
+				office_view_sprite_state = 0;
 				for(uint8_t i = 0; i < 2; i++) {
 					if(door_button_flags & (DOOR_BUTTON_LIGHT_FLAG << (i * 2))) {
-						office_sprite_state = (i + 1) * (light_random > 0);
+						office_view_sprite_state = (i + 1) * (light_random > 0);
 						light_buzz_volume_new = clampf((float)light_random, 0.0f, 1.0f);
 					}
 				}
@@ -543,7 +554,7 @@ int main() {
 		}
 
 		glm_mat4_copy(GLM_MAT4_IDENTITY, matrix_view);
-		glm_translate(matrix_view, (vec3){(cam_state == CAM_STATE_OPENED) ? camera_look_current : office_look_current, 0.0f, 0.0f});
+		glm_translate(matrix_view, (vec3){(camera_state == CAM_STATE_OPENED) ? camera_look_current : office_look_current, 0.0f, 0.0f});
 
 		/* draw */
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -556,9 +567,8 @@ int main() {
 		glUniformMatrix4fv(glGetUniformLocation(sprite_shader_program, "view"), 1, GL_FALSE, (const GLfloat *)matrix_view);
 		glUniformMatrix4fv(glGetUniformLocation(sprite_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
 
-		sprite_draw(office_sprite, sprite_shader_program, office_sprite_state);
-
-		if(cam_state != CAM_STATE_OPENED) {
+		if(camera_state != CAM_STATE_OPENED) {
+			sprite_draw(office_view_sprite, sprite_shader_program, office_view_sprite_state);
 			sprite_draw(fan_animation_sprite, sprite_shader_program, (uint8_t)fan_animation_frame);
 
 			for(uint8_t i = 0; i < 2; i++) {
@@ -569,6 +579,8 @@ int main() {
 			for(uint8_t i = 0; i < 2; i++) {
 				sprite_draw(door_button_sprites[i], sprite_shader_program, (door_button_flags >> (2 * i)) & 0x3);
 			}
+		} else {
+			sprite_draw(camera_view_sprite, sprite_shader_program, camera_selected);
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -585,6 +597,18 @@ int main() {
 		/* ui elements */
 		glUseProgram(render_ui_shader_program);
 		glUniformMatrix4fv(glGetUniformLocation(render_ui_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
+
+		if(camera_state == CAM_STATE_OPENED) {
+			uint8_t blink_state;
+			float blink_timer = (float)time_now * 0.4166667f;
+			blink_timer -= (float)((int32_t)blink_timer);
+			blink_state = blink_timer < 0.5f;
+			sprite_draw(camera_border_sprite, render_ui_shader_program, 0);
+			sprite_draw(camera_map_sprite, render_ui_shader_program, blink_state);
+
+			if(blink_state)
+				sprite_draw(camera_recording_sprite, render_ui_shader_program, 0);
+		}
 
 		sprite_draw(power_usage_text_sprite, render_ui_shader_program, 0);
 		sprite_draw(power_usage_sprite, render_ui_shader_program, power_usage_value);
@@ -622,12 +646,12 @@ int main() {
 			}
 		}
 
-		if((cam_state == CAM_STATE_CLOSED || cam_state == CAM_STATE_OPENED)) {
-			if(!cam_bar_hovering) {
-				sprite_draw(cam_flip_bar_sprite, render_ui_shader_program, 0);
+		if((camera_state == CAM_STATE_CLOSED || camera_state == CAM_STATE_OPENED)) {
+			if(!camera_bar_hovering) {
+				sprite_draw(camera_flip_bar_sprite, render_ui_shader_program, 0);
 			}
 		} else {
-			sprite_draw(cam_flip_animation_sprite, render_ui_shader_program, (uint16_t)(fabsf((10.0f * (cam_state == CAM_STATE_OPENING)) - ((cam_flip_timer * (1 / CAM_TIMER_INIT)) * 10.0f))));
+			sprite_draw(camera_flip_animation_sprite, render_ui_shader_program, (uint16_t)(fabsf((10.0f * (camera_state == CAM_STATE_OPENING)) - ((camera_flip_timer * (1 / CAM_TIMER_INIT)) * 10.0f))));
 		}
 
 
@@ -638,8 +662,12 @@ int main() {
 	/* destroy everything */
 	glDeleteFramebuffers(1, &fbo);
 
-	sprite_destroy(&cam_flip_animation_sprite);
-	sprite_destroy(&cam_flip_bar_sprite);
+	sprite_destroy(&camera_recording_sprite);
+	sprite_destroy(&camera_map_sprite);
+	sprite_destroy(&camera_border_sprite);
+
+	sprite_destroy(&camera_flip_animation_sprite);
+	sprite_destroy(&camera_flip_bar_sprite);
 	sprite_destroy(&night_number_sprite);
 	sprite_destroy(&night_text_sprite);
 	sprite_destroy(&hour_number_sprite);
@@ -654,7 +682,8 @@ int main() {
 		sprite_destroy(&door_animation_sprites[i]);
 	}
 	sprite_destroy(&fan_animation_sprite);
-	sprite_destroy(&office_sprite);
+	sprite_destroy(&camera_view_sprite);
+	sprite_destroy(&office_view_sprite);
 
 	glDeleteShader(sprite_shader_program);
 	glDeleteShader(render_ui_shader_program);
