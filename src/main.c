@@ -524,7 +524,7 @@ int main() {
 		{ /* update */
 			float ticks = time_delta * 60.0f;
 			fan_animation_frame += ticks;
-			fan_animation_frame = fmodf(fan_animation_frame, 3);
+			fan_animation_frame = fmod2(fan_animation_frame, 3);
 
 			/* update door animations */
 			for(uint8_t i = 0; i < 2; i++) {

@@ -12,3 +12,7 @@ float clampf(const float x, const float min, const float max) {
     return (OOR * x) + ((1-Flag_A) * min) + ((1-Flag_B) * max);
 }
 
+float fmod2(const float val, const float mod) {
+	const float val_scaled = val / mod;
+	return (val_scaled - (float)((int32_t)val_scaled)) * mod;
+}
