@@ -1,6 +1,9 @@
 #include "assets.h"
 #include "sound.h"
 
+static uint8_t global_loaded;
+static uint8_t game_loaded;
+
 assets_global_t assets_global_create() {
 	assets_global_t a;
 	a.night_text_sprite = sprite_create((vec2){1148, 74}, (vec2){63, 14}, "resources/graphics/ui/night/night.png", 1);
@@ -8,14 +11,39 @@ assets_global_t assets_global_create() {
 
 	a.static_animation_sprite = sprite_create(GLM_VEC2_ZERO, (vec2){1280.0f, 720.0f}, "resources/graphics/general/static/", 8);
 	a.blip_animation_sprite = sprite_create(GLM_VEC2_ZERO, (vec2){1280.0f, 720.0f}, "resources/graphics/general/blip/", 9);
+
+	a.black_sprite = sprite_create(GLM_VEC2_ZERO, (vec2){1600.0f, 720.0f}, "resources/graphics/black.png", 1);
+
+	a.blip_sound = sound_create("resources/audio/sounds/blip.wav", 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
+	a.static_sound = sound_create("resources/audio/sounds/static.wav", 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
+
+	global_loaded = 1;
 	return a;
 }
+
 void assets_global_destroy(assets_global_t *a) {
 	sprite_destroy(&a->night_text_sprite);
 	sprite_destroy(&a->night_number_sprite);
 	
 	sprite_destroy(&a->static_animation_sprite);
 	sprite_destroy(&a->blip_animation_sprite);
+
+	sprite_destroy(&a->black_sprite);
+
+	sound_destroy(&a->blip_sound);
+	sound_destroy(&a->static_sound);
+
+	global_loaded = 0;
+}
+
+assets_title_t assets_title_create(void) {
+	assets_title_t a;
+	a.music = sound_create("resources/audio/music/title-music.wav", 1.0f, 1.0f, GLM_VEC3_ZERO, 1);
+	return a;
+}
+
+void assets_title_destroy(assets_title_t *a) {
+	sound_destroy(&a->music);
 }
 
 assets_game_t assets_game_create() {
@@ -53,7 +81,8 @@ assets_game_t assets_game_create() {
 	a.camera_open_sound = sound_create("resources/audio/sounds/cam-open.wav", 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
 	a.camera_scan_sound = sound_create("resources/audio/sounds/cam-scan.wav", 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
 	a.camera_close_sound = sound_create("resources/audio/sounds/cam-close.wav", 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
-	a.camera_blip_sound = sound_create("resources/audio/sounds/blip.wav", 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
+
+	game_loaded = 1;
 
 	return a;
 }
@@ -89,5 +118,10 @@ void assets_game_destroy(assets_game_t *a) {
 	sound_destroy(&a->camera_open_sound);
 	sound_destroy(&a->camera_scan_sound);
 	sound_destroy(&a->camera_close_sound);
-	sound_destroy(&a->camera_blip_sound);
+
+	game_loaded = 0;
+}
+
+void assets_print_loaded(const float time_delta) {
+	printf("GLOBAL: %u, GAME: %u, FPS: %.0f\n", global_loaded, game_loaded, (double)(1.0f / time_delta));
 }

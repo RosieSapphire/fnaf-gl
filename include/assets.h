@@ -10,7 +10,16 @@ typedef struct {
 
 	sprite_t blip_animation_sprite;
 	sprite_t static_animation_sprite;
+
+	sprite_t black_sprite;
+
+	sound_t blip_sound;
+	sound_t static_sound;
 } assets_global_t;
+
+typedef struct {
+	sound_t music;
+} assets_title_t;
 
 typedef struct {
 	sprite_t office_view_sprite;
@@ -43,14 +52,17 @@ typedef struct {
 	sound_t camera_open_sound;
 	sound_t camera_scan_sound;
 	sound_t camera_close_sound;
-	sound_t camera_blip_sound;
-
 } assets_game_t;
 
 assets_global_t assets_global_create(void);
 void assets_global_destroy(assets_global_t *a);
 
+assets_title_t assets_title_create(void);
+void assets_title_destroy(assets_title_t *a);
+
 assets_game_t assets_game_create(void);
 void assets_game_destroy(assets_game_t *a);
+
+void assets_print_loaded(const float time_delta);
 
 #endif
