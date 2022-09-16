@@ -70,6 +70,7 @@ static sprite_t camera_recording_sprite;
 
 static sprite_t camera_button_sprite;
 static sprite_t camera_button_name_sprite;
+static sprite_t camera_disabled_sprite;
 
 static sprite_t blip_animation_sprite;
 static uint8_t blip_animation_frame = 0;
@@ -79,6 +80,7 @@ static uint8_t static_animation_frame = 0;
 static uint8_t static_animation_rand_timer = 60;
 static uint8_t static_animation_rand_value = 0;
 static float static_animation_alpha = 0.0f;
+
 
 enum {
 	CAM_STATE_CLOSED = 0,
@@ -224,10 +226,12 @@ int main() {
 		sprite_create(&camera_recording_sprite, (vec2){68.0f, 52.0f}, (vec2){50.0f, 50.0f}, "resources/graphics/ui/camera/recording-dot.png", 1);
 		sprite_create(&camera_button_sprite, GLM_VEC2_ZERO, (vec2){60.0f, 40.0f}, "resources/graphics/ui/camera/map/button/", 2);
 		sprite_create(&camera_button_name_sprite, GLM_VEC2_ZERO, (vec2){31.0f, 25.0f}, "resources/graphics/ui/camera/map/button/text/", 11);
+		sprite_create(&camera_disabled_sprite, (vec2){464.0f, 69.0f}, (vec2){371.0f, 54.0f}, "resources/graphics/ui/camera/map/disabled.png", 1);
 
 		sprite_create(&static_animation_sprite, GLM_VEC2_ZERO, (vec2){1280.0f, 720.0f}, "resources/graphics/general/static/", 8);
 
 		sprite_create(&blip_animation_sprite, GLM_VEC2_ZERO, (vec2){1280.0f, 720.0f}, "resources/graphics/general/blip/", 9);
+
 	}
 
 	{ /* set up audio engine */
@@ -703,6 +707,10 @@ int main() {
 
 			if(blink_state)
 				sprite_draw(camera_recording_sprite, ui_shader_program, 0);
+
+			if(camera_selected == 9) {
+				sprite_draw(camera_disabled_sprite, ui_shader_program, 0);
+			}
 		}
 
 		sprite_draw(power_usage_text_sprite, ui_shader_program, 0);
@@ -760,6 +768,7 @@ int main() {
 
 	sprite_destroy(&static_animation_sprite);
 
+	sprite_destroy(&camera_disabled_sprite);
 	sprite_destroy(&camera_button_sprite);
 	sprite_destroy(&camera_recording_sprite);
 	sprite_destroy(&camera_map_sprite);
