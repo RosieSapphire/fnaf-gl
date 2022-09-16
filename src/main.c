@@ -78,6 +78,8 @@ static uint8_t camera_state = CS_CLOSED;
 static uint8_t camera_selected = 0;
 static float camera_flip_timer = CAM_TIMER_INIT;
 
+static uint8_t light_flicker;
+
 static float office_look_current = -160.0f;
 static uint8_t space_pressed = 0;
 
@@ -291,6 +293,8 @@ int main() {
 		double time_now;
 		float time_delta;
 		float ticks;
+
+
 		time_now = glfwGetTime();
 		time_delta = (float)(time_now - time_last);
 		time_last = time_now;
@@ -342,7 +346,7 @@ int main() {
 		}
 
 		mouse_get_position(window, mouse_position);
-		assets_print_loaded(time_delta);
+		// assets_print_loaded(time_delta);
 
 		/* update all animations */
 		fan_animation_frame += ticks;
@@ -364,12 +368,12 @@ int main() {
 
 			/* light flicker effect */
 			float light_buzz_volume_new = 0.0f;
-			uint8_t light_random = (uint8_t)(rand() % 10);
 			office_view_sprite_state = 0;
+			light_flicker = (uint8_t)(rand() % 10);
 			for(uint8_t i = 0; i < 2; i++) {
 				if(door_button_flags & (DOOR_BUTTON_LIGHT_FLAG << (i * 2))) {
-					office_view_sprite_state = (i + 1) * (light_random > 0);
-					light_buzz_volume_new = clampf((float)light_random, 0.0f, 1.0f);
+					office_view_sprite_state = (i + 1) * (light_flicker > 1);
+					light_buzz_volume_new = (float)(light_flicker > 1);
 				}
 			}
 
@@ -604,10 +608,11 @@ int main() {
 					}
 				} else {
 					const uint8_t camera_selected_offsets[11] = { 0, 7, 13, 18, 54, 60, 62, 68, 77, 0, 81 };
-					if(camera_selected != 9)
-						sprite_draw(assets_game.camera_view_sprite, sprite_shader_program, camera_selected_offsets[camera_selected]);
-					else
+					if(camera_selected != 9) {
+						sprite_draw(assets_game.camera_view_sprite, sprite_shader_program, camera_selected_offsets[camera_selected] + ((light_flicker <= 3) * camera_selected == 3));
+					} else {
 						sprite_draw(assets_global.black_sprite, sprite_shader_program, 0);
+					}
 				}
 
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
