@@ -5,15 +5,15 @@
 #include <glad/glad.h>
 #include "file.h"
 
-uint32_t shader_create(const char *shader_vertex_path, const char *shader_fragment_path) {
+shader_t shader_create(const char *shader_vertex_path, const char *shader_fragment_path) {
 	const uint32_t shader_types[2] = {GL_VERTEX_SHADER, GL_FRAGMENT_SHADER};
 	const char *shader_paths[2] = {shader_vertex_path, shader_fragment_path};
 	#ifdef DEBUG
 		const char *shader_type_names[2] = {"Vertex", "Fragment"};
 	#endif
 	char *shader_sources[2];
-	uint32_t shaders[2];
-	uint32_t shader_program;
+	shader_t shaders[2];
+	shader_t shader_program;
 
 	shader_program = glCreateProgram();
 	for(uint8_t i = 0; i < 2; i++) {

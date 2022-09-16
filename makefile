@@ -5,8 +5,8 @@ CORES=-j8
 
 CFLAGS=-std=c99
 
-SRC=main.c glad.c shader.c sprite.c sound.c mouse.c helpers.c file.c texture.c
-OBJ=main.o glad.o shader.o sprite.o sound.o mouse.o helpers.o file.o texture.o
+SRC=main.c glad.c shader.c sprite.c sound.c mouse.c helpers.c file.c texture.c assets.c
+OBJ=main.o glad.o shader.o sprite.o sound.o mouse.o helpers.o file.o texture.o assets.o
 
 BIN=five-nights-at-freddys
 

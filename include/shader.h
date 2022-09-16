@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
-uint32_t shader_create(const char *shader_vertex_path, const char *shader_fragment_path);
+typedef uint32_t shader_t;
+shader_t shader_create(const char *shader_vertex_path, const char *shader_fragment_path);
 
 #endif

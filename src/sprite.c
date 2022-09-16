@@ -5,7 +5,8 @@
 #include <stdarg.h>
 #include <assert.h>
 
-void sprite_create(sprite_t *sprite, vec2 pos, vec2 size, const char *path_format, const uint16_t texture_count) {
+sprite_t sprite_create(vec2 pos, vec2 size, const char *path_format, const uint16_t texture_count) {
+	sprite_t sprite;
 	char *paths;
 	uint8_t texture_path_length = 0;
 	uint8_t chars_excluded = 0;
@@ -24,20 +25,20 @@ void sprite_create(sprite_t *sprite, vec2 pos, vec2 size, const char *path_forma
 		assert(texture_count > 0);
 	#endif
 
-	glm_vec2_copy(size, sprite->size);
+	glm_vec2_copy(size, sprite.size);
 
-	glGenVertexArrays(1, &sprite->vao);
-	glBindVertexArray(sprite->vao);
+	glGenVertexArrays(1, &sprite.vao);
+	glBindVertexArray(sprite.vao);
 
-	glGenBuffers(1, &sprite->vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, sprite->vbo);
+	glGenBuffers(1, &sprite.vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, sprite.vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), NULL);
 	glEnableVertexAttribArray(0);
 
-	sprite->textures = calloc(texture_count, sizeof(texture_t));
-	sprite->texture_count = texture_count;
+	sprite.textures = calloc(texture_count, sizeof(texture_t));
+	sprite.texture_count = texture_count;
 	while(*c) {
 		if(*c == '%') {
 			chars_excluded++;
@@ -51,15 +52,17 @@ void sprite_create(sprite_t *sprite, vec2 pos, vec2 size, const char *path_forma
 		for(uint16_t i = 0; i < texture_count; i++) {
 			const uint32_t offset = (i * texture_path_length);
 			sprintf(paths + offset, "%s%u.png", path_format, i);
-			sprite->textures[i] = texture_create(paths + offset, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+			sprite.textures[i] = texture_create(paths + offset, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
 		}
 	} else {
 		paths = calloc(texture_count * texture_path_length, sizeof(char));
 		sprintf(paths, "%s", path_format);
-		*sprite->textures = texture_create(paths, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
+		*sprite.textures = texture_create(paths, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR);
 	}
 	free(paths);
-	glm_vec2_copy(pos, sprite->position);
+	glm_vec2_copy(pos, sprite.position);
+
+	return sprite;
 }
 
 void sprite_draw(sprite_t sprite, uint32_t shader, const uint16_t texture_index) {

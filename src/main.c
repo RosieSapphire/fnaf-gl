@@ -9,9 +9,9 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 
+#include "assets.h"
 #include "file.h"
 #include "texture.h"
-#include "sprite.h"
 #include "sound.h"
 #include "shader.h"
 #include "mouse.h"
@@ -46,47 +46,20 @@ static uint32_t render_shader_program;
 static uint32_t ui_shader_program;
 
 /* sprites and textures */
-static sprite_t office_view_sprite;
-static sprite_t camera_view_sprite;
-static sprite_t camera_view_name_sprite;
-static sprite_t fan_animation_sprite;
-static sprite_t door_button_sprites[2];
-static sprite_t door_animation_sprites[2];
-static sprite_t power_usage_sprite;
-static sprite_t power_usage_text_sprite;
-static sprite_t power_left_sprite;
-static sprite_t power_left_percent_sprite;
-static sprite_t power_left_number_sprite;
-static sprite_t hour_am_sprite;
-static sprite_t hour_number_sprite;
-static sprite_t night_text_sprite;
-static sprite_t night_number_sprite;
-static sprite_t camera_flip_bar_sprite;
-static sprite_t camera_flip_animation_sprite;
+static assets_global_t assets_global;
+static assets_game_t assets_game;
 
-static sprite_t camera_border_sprite;
-static sprite_t camera_map_sprite;
-static sprite_t camera_recording_sprite;
-
-static sprite_t camera_button_sprite;
-static sprite_t camera_button_name_sprite;
-static sprite_t camera_disabled_sprite;
-
-static sprite_t blip_animation_sprite;
 static uint8_t blip_animation_frame = 0;
-
-static sprite_t static_animation_sprite;
 static uint8_t static_animation_frame = 0;
 static uint8_t static_animation_rand_timer = 60;
 static uint8_t static_animation_rand_value = 0;
 static float static_animation_alpha = 0.0f;
 
-
 enum {
-	CAM_STATE_CLOSED = 0,
-	CAM_STATE_OPENING,
-	CAM_STATE_OPENED,
-	CAM_STATE_CLOSING
+	CS_CLOSED = 0,
+	CS_OPENING,
+	CS_OPENED,
+	CS_CLOSING
 };
 
 static uint32_t sprite_shader_program;
@@ -99,28 +72,9 @@ static float door_frame_timers[2] = {0.0f};
 static float power_left_value = 99.9f;
 static float hour_timer = 0.0f;
 static uint8_t camera_bar_hovering = 0;
-static uint8_t camera_state = CAM_STATE_CLOSED;
+static uint8_t camera_state = CS_CLOSED;
 static uint8_t camera_selected = 0;
 static float camera_flip_timer = CAM_TIMER_INIT;
-
-/* sound sources */
-static sound_buffer_t fan_sound_buffer;
-static sound_buffer_t light_sound_buffer;
-static sound_buffer_t door_sound_buffer;
-static sound_buffer_t freddy_nose_sound_buffer;
-static sound_buffer_t camera_open_sound_buffer;
-static sound_buffer_t camera_scan_sound_buffer;
-static sound_buffer_t camera_close_sound_buffer;
-static sound_buffer_t camera_blip_sound_buffer;
-
-static sound_source_t fan_sound_source;
-static sound_source_t light_sound_source;
-static sound_source_t door_sound_source;
-static sound_source_t freddy_nose_sound_source;
-static sound_source_t camera_open_sound_source;
-static sound_source_t camera_scan_sound_source;
-static sound_source_t camera_close_sound_source;
-static sound_source_t camera_blip_sound_source;
 
 static float office_look_current = 0.0f;
 // static uint8_t space_pressed = 0;
@@ -130,6 +84,13 @@ static float camera_look_hold_timer = 0.0f;
 static uint8_t camera_look_state = 0;
 
 static mat4 matrix_projection;
+
+enum {
+	GS_TITLE,
+	GS_GAME,
+};
+
+static uint8_t game_state = GS_GAME;
 
 int main() {
 	/* load GLFW */
@@ -198,42 +159,6 @@ int main() {
 	ui_shader_program = shader_create("resources/shaders/render_ui_vertex.glsl", "resources/shaders/render_ui_fragment.glsl");
 	sprite_shader_program = shader_create("resources/shaders/sprite_vertex.glsl", "resources/shaders/sprite_fragment.glsl");
 
-	{ /* load sprites */
-		vec2 door_positions[2] = {{72.0f, -1.0f}, {1270.0f, -2.0f}};
-		sprite_create(&office_view_sprite, GLM_VEC2_ZERO, (vec2){1600.0f, 720.0f}, "resources/graphics/office/states/", 5);
-		sprite_create(&camera_view_sprite, GLM_VEC2_ZERO, (vec2){1600.0f, 720.0f}, "resources/graphics/camera/", 85);
-		sprite_create(&camera_view_name_sprite, (vec2){832.0f, 292.0f}, (vec2){239.0f, 26.0f}, "resources/graphics/ui/camera/map/names/", 11);
-		sprite_create(&fan_animation_sprite, (vec2){780.0f, 303.0f}, (vec2){137.0f, 196.0f}, "resources/graphics/office/fan/", 3);
-		sprite_create(&door_button_sprites[0], (vec2){6.0f, 263.0f}, (vec2){92.0f, 247.0f}, "resources/graphics/office/doors/buttons/l", 4);
-		sprite_create(&door_button_sprites[1], (vec2){1497.0f, 273.0f}, (vec2){92.0f, 247.0f}, "resources/graphics/office/doors/buttons/r", 4);
-		for(uint8_t i = 0; i < 2; i++) {
-			sprite_create(&door_animation_sprites[i], door_positions[i], (vec2){223.0f, 720.0f}, "resources/graphics/office/doors/", 15);
-		}
-		sprite_create(&power_usage_sprite, (vec2){120, 657}, (vec2){103, 32}, "resources/graphics/ui/power/levels/", 4);
-		sprite_create(&power_usage_text_sprite, (vec2){38, 667}, (vec2){72, 14}, "resources/graphics/ui/power/usage.png", 1);
-		sprite_create(&power_left_sprite, (vec2){38, 631}, (vec2){137, 14}, "resources/graphics/ui/power/power-left-0.png", 1);
-		sprite_create(&power_left_percent_sprite, (vec2){228, 632}, (vec2){11, 14}, "resources/graphics/ui/power/power-left-1.png", 1);
-		sprite_create(&power_left_number_sprite, GLM_VEC2_ZERO, (vec2){18, 22}, "resources/graphics/ui/power/numbers/", 10);
-		sprite_create(&hour_am_sprite, (vec2){1200, 31}, (vec2){42, 26}, "resources/graphics/ui/am.png", 1);
-		sprite_create(&hour_number_sprite, (vec2){1161, 29}, (vec2){24, 30}, "resources/graphics/ui/hour/", 6);
-		sprite_create(&night_text_sprite, (vec2){1148, 74}, (vec2){63, 14}, "resources/graphics/ui/night/night.png", 1);
-		sprite_create(&night_number_sprite, (vec2){1223, 72}, (vec2){14, 17}, "resources/graphics/ui/night/", 7);
-		sprite_create(&camera_flip_bar_sprite, (vec2){255, 638}, (vec2){600, 60}, "resources/graphics/ui/camera/bar.png", 1);
-		sprite_create(&camera_flip_animation_sprite, GLM_VEC2_ZERO, (vec2){1280, 720}, "resources/graphics/ui/camera/flip/", 11);
-
-		sprite_create(&camera_border_sprite, GLM_VEC2_ZERO, (vec2){1280, 720}, "resources/graphics/ui/camera/border.png", 1);
-		sprite_create(&camera_map_sprite, (vec2){848.0f, 313.0f}, (vec2){400.0f, 400.0f}, "resources/graphics/ui/camera/map/", 2);
-		sprite_create(&camera_recording_sprite, (vec2){68.0f, 52.0f}, (vec2){50.0f, 50.0f}, "resources/graphics/ui/camera/recording-dot.png", 1);
-		sprite_create(&camera_button_sprite, GLM_VEC2_ZERO, (vec2){60.0f, 40.0f}, "resources/graphics/ui/camera/map/button/", 2);
-		sprite_create(&camera_button_name_sprite, GLM_VEC2_ZERO, (vec2){31.0f, 25.0f}, "resources/graphics/ui/camera/map/button/text/", 11);
-		sprite_create(&camera_disabled_sprite, (vec2){464.0f, 69.0f}, (vec2){371.0f, 54.0f}, "resources/graphics/ui/camera/map/disabled.png", 1);
-
-		sprite_create(&static_animation_sprite, GLM_VEC2_ZERO, (vec2){1280.0f, 720.0f}, "resources/graphics/general/static/", 8);
-
-		sprite_create(&blip_animation_sprite, GLM_VEC2_ZERO, (vec2){1280.0f, 720.0f}, "resources/graphics/general/blip/", 9);
-
-	}
-
 	{ /* set up audio engine */
 		#ifdef DEBUG
 			const char *sound_device_name;
@@ -276,30 +201,14 @@ int main() {
 		#endif
 	}
 
-	/* load sounds */
-	fan_sound_buffer = sound_buffer_create("resources/audio/sounds/fan.wav");
-	fan_sound_source = sound_source_create(fan_sound_buffer, 1.0f, 0.25f, GLM_VEC3_ZERO, 1);
+	/* load sounds */ 
+	assets_global = assets_global_create();
+	switch(game_state) {
+		case GS_GAME:
+			assets_game = assets_game_create();
+			break;
+	}
 
-	light_sound_buffer = sound_buffer_create("resources/audio/sounds/light-hum.wav");
-	light_sound_source = sound_source_create(light_sound_buffer, 1.0f, 0.0f, GLM_VEC3_ZERO, 1);
-
-	door_sound_buffer = sound_buffer_create("resources/audio/sounds/door-activate.wav");
-	door_sound_source = sound_source_create(door_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
-
-	freddy_nose_sound_buffer = sound_buffer_create("resources/audio/sounds/boop.wav");
-	freddy_nose_sound_source = sound_source_create(freddy_nose_sound_buffer, 1.0f, 0.4f, GLM_VEC3_ZERO, 0);
-
-	camera_open_sound_buffer = sound_buffer_create("resources/audio/sounds/cam-open.wav");
-	camera_open_sound_source = sound_source_create(camera_open_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
-
-	camera_scan_sound_buffer = sound_buffer_create("resources/audio/sounds/cam-scan.wav");
-	camera_scan_sound_source = sound_source_create(camera_scan_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
-
-	camera_close_sound_buffer = sound_buffer_create("resources/audio/sounds/cam-close.wav");
-	camera_close_sound_source = sound_source_create(camera_close_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
-
-	camera_blip_sound_buffer = sound_buffer_create("resources/audio/sounds/blip.wav");
-	camera_blip_sound_source = sound_source_create(camera_blip_sound_buffer, 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
 
 	/* set up audio listener */
 	alListeneri(AL_DISTANCE_MODEL, AL_INVERSE_DISTANCE_CLAMPED);
@@ -363,9 +272,9 @@ int main() {
 		glBindVertexArray(0);
 	}
 
-	alSourcePlay(fan_sound_source);
-	alSourcef(fan_sound_source, AL_GAIN, 0.25f);
-	alSourcePlay(light_sound_source);
+	alSourcePlay(assets_game.fan_sound.source);
+	alSourcef(assets_game.fan_sound.source, AL_GAIN, 0.25f);
+	alSourcePlay(assets_game.light_sound.source);
 
 	/* main loop */
 	srand((uint32_t)time(NULL));
@@ -403,7 +312,7 @@ int main() {
 		if(glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !space_pressed) {
 			camera_selected++;
 			camera_selected %= 11;
-			alSourcePlay(camera_blip_sound_source);
+			alSourcePlay(camera_blip_sound.source);
 			space_pressed = 1;
 		}
 
@@ -414,7 +323,7 @@ int main() {
 
 		/* use the appropriate room scroll setting */
 		mouse_get_position(window, mouse_position);
-		if(camera_state != CAM_STATE_OPENED) {
+		if(camera_state != CS_OPENED) {
 			/* default room turning */
 			float mouse_distance_from_center = (float)mouse_position[0] - (WINDOW_WIDTH / 2.0f);
 			mouse_distance_from_center = clampf(mouse_distance_from_center, -640.0f, 640.0f);
@@ -441,21 +350,21 @@ int main() {
 					camera_bar_hovering = 1;
 
 					switch(camera_state) {
-						case CAM_STATE_CLOSED:
-							camera_state = CAM_STATE_OPENING;
-							alSourceStop(camera_close_sound_source);
-							alSourcePlay(camera_open_sound_source);
-							alSourcePlay(camera_scan_sound_source);
+						case CS_CLOSED:
+							camera_state = CS_OPENING;
+							alSourceStop(assets_game.camera_close_sound.source);
+							alSourcePlay(assets_game.camera_open_sound.source);
+							alSourcePlay(assets_game.camera_scan_sound.source);
 
 							break;
 
-						case CAM_STATE_OPENED:
-							camera_state = CAM_STATE_CLOSING;
-							alSourceStop(camera_open_sound_source);
-							alSourceStop(camera_scan_sound_source);
-							alSourcePlay(camera_close_sound_source);
+						case CS_OPENED:
+							camera_state = CS_CLOSING;
+							alSourceStop(assets_game.camera_open_sound.source);
+							alSourceStop(assets_game.camera_scan_sound.source);
+							alSourcePlay(assets_game.camera_close_sound.source);
 
-							alSourcef(fan_sound_source, AL_GAIN, 0.25f);
+							alSourcef(assets_game.fan_sound.source, AL_GAIN, 0.25f);
 							break;
 
 						default:
@@ -466,7 +375,7 @@ int main() {
 
 			camera_bar_hovering *= !(mouse_position[1] < 643.0);
 
-			if(camera_state == CAM_STATE_OPENING || camera_state == CAM_STATE_CLOSING) {
+			if(camera_state == CS_OPENING || camera_state == CS_CLOSING) {
 				if(camera_flip_timer > 0.0f) {
 					camera_flip_timer -= time_delta;
 				} else {
@@ -476,11 +385,11 @@ int main() {
 				}
 			}
 
-			if(camera_state == CAM_STATE_OPENED && camera_state_old != CAM_STATE_OPENED) {
+			if(camera_state == CS_OPENED && camera_state_old != CS_OPENED) {
 				door_button_flags &= DOOR_BUTTON_BOTH_DOORS_FLAG;
-				alSourcePlay(camera_blip_sound_source);
+				alSourcePlay(assets_game.camera_blip_sound.source);
 				blip_animation_frame = 0;
-				alSourcef(fan_sound_source, AL_GAIN, 0.1f);
+				alSourcef(assets_game.fan_sound.source, AL_GAIN, 0.1f);
 			}
 		}
 
@@ -512,14 +421,14 @@ int main() {
 			const uint8_t door_button_flags_old = door_button_flags;
 			const int32_t mouse_offset = (int32_t)office_look_current;
 
-			if(camera_state != CAM_STATE_OPENED) {
+			if(camera_state != CS_OPENED) {
 				const ivec4 door_button_boxes[4] = {{27, 89, 251, 371}, {1519, 1581, 267, 387}, {25, 87, 393, 513}, {1519, 1581, 398, 518}};
 				for(uint8_t i = 0; i < 2; i++) {
 					uint8_t door_button_bit_mask = (uint8_t)(DOOR_BUTTON_DOOR_FLAG << (i * 2));
 					if(!((uint8_t)door_frame_timers[i]) || (uint8_t)door_frame_timers[i] == 28) {
 						if(mouse_inside_box(window, door_button_boxes[i], mouse_offset)) {
 							door_button_flags ^= door_button_bit_mask;
-							alSourcePlay(door_sound_source);
+							alSourcePlay(assets_game.door_sound.source);
 						}
 					}
 
@@ -528,8 +437,8 @@ int main() {
 
 				/* pressing Freddy's nose */
 				if(mouse_inside_box(window, (ivec4){674, 682, 236, 244}, mouse_offset)) {
-					alSourceStop(freddy_nose_sound_source);
-					alSourcePlay(freddy_nose_sound_source);
+					alSourceStop(assets_game.freddy_nose_sound.source);
+					alSourcePlay(assets_game.freddy_nose_sound.source);
 				}
 			} else {
 				/* selecting different cameras */
@@ -541,7 +450,7 @@ int main() {
 					glm_ivec4_sub(camera_button_box_current, (ivec4){29, -31, 19, -21}, camera_button_box_current);
 
 					if(mouse_inside_box(window, camera_button_box_current, 0.0f)) {
-						alSourcePlay(camera_blip_sound_source);
+						alSourcePlay(assets_game.camera_blip_sound.source);
 						blip_animation_frame = 0;
 						camera_selected = i;
 					}
@@ -569,7 +478,7 @@ int main() {
 		for(uint8_t i = 0; i < 2; i++) {
 			power_usage_value += ((door_button_flags >> (i * 2)) & 0x1) + ((((door_button_flags >> (i * 2)) & 0x2) > 0));
 		}
-		power_usage_value += camera_state == CAM_STATE_OPENED;
+		power_usage_value += camera_state == CS_OPENED;
 
 		power_left_value -= ((float)power_usage_value + 1.0f) * time_delta * 0.1f;
 
@@ -622,13 +531,13 @@ int main() {
 				}
 				static_animation_alpha = 1.0f - ((150.0f + (rand() % 50) + static_animation_rand_value) / 255.0f);
 
-				alSourcef(light_sound_source, AL_GAIN, light_buzz_volume_new);
+				alSourcef(assets_game.light_sound.source, AL_GAIN, light_buzz_volume_new);
 				scaled_update_timer = 0.0f;
 			}
 		}
 
 		glm_mat4_identity(matrix_view);
-		glm_translate(matrix_view, (vec3){(camera_state == CAM_STATE_OPENED) ? camera_look_current : office_look_current, 0.0f, 0.0f});
+		glm_translate(matrix_view, (vec3){(camera_state == CS_OPENED) ? camera_look_current : office_look_current, 0.0f, 0.0f});
 
 		/* draw */
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -641,21 +550,21 @@ int main() {
 		glUniformMatrix4fv(glGetUniformLocation(sprite_shader_program, "view"), 1, GL_FALSE, (const GLfloat *)matrix_view);
 		glUniformMatrix4fv(glGetUniformLocation(sprite_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
 
-		if(camera_state != CAM_STATE_OPENED) {
-			sprite_draw(office_view_sprite, sprite_shader_program, office_view_sprite_state);
-			sprite_draw(fan_animation_sprite, sprite_shader_program, (uint8_t)fan_animation_frame);
+		if(camera_state != CS_OPENED) {
+			sprite_draw(assets_game.office_view_sprite, sprite_shader_program, office_view_sprite_state);
+			sprite_draw(assets_game.fan_animation_sprite, sprite_shader_program, (uint8_t)fan_animation_frame);
 
 			for(uint8_t i = 0; i < 2; i++) {
-				sprite_draw(door_animation_sprites[i], sprite_shader_program, (uint8_t)(door_frame_timers[i] / 2));
+				sprite_draw(assets_game.door_animation_sprites[i], sprite_shader_program, (uint8_t)(door_frame_timers[i] / 2));
 				glUniform1i(glGetUniformLocation(sprite_shader_program, "flip_x"), !i);
 			}
 
 			for(uint8_t i = 0; i < 2; i++) {
-				sprite_draw(door_button_sprites[i], sprite_shader_program, (door_button_flags >> (2 * i)) & 0x3);
+				sprite_draw(assets_game.door_button_sprites[i], sprite_shader_program, (door_button_flags >> (2 * i)) & 0x3);
 			}
 		} else {
 			const uint8_t camera_selected_offsets[11] = { 0, 7, 13, 18, 54, 60, 62, 68, 77, 255, 81 };
-			sprite_draw(camera_view_sprite, sprite_shader_program, camera_selected_offsets[camera_selected]);
+			sprite_draw(assets_game.camera_view_sprite, sprite_shader_program, camera_selected_offsets[camera_selected]);
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -674,7 +583,7 @@ int main() {
 		glUniformMatrix4fv(glGetUniformLocation(ui_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
 		glUniform1f(glGetUniformLocation(ui_shader_program, "alpha"), 1.0f);
 
-		if(camera_state == CAM_STATE_OPENED) {
+		if(camera_state == CS_OPENED) {
 			uint8_t blink_state;
 			float blink_timer = fmod2((float)time_now * 0.4166667f, 1.0f);
 			const float camera_view_name_widths[11] = { 217.0f, 239.0f, 228.0f, 192.0f, 305.0f, 284.0f, 192.0f, 305.0f, 195.0f, 151.0f, 196.0f };
@@ -682,47 +591,47 @@ int main() {
 			blink_state = blink_timer < 0.5f;
 
 			glUniform1f(glGetUniformLocation(ui_shader_program, "alpha"), static_animation_alpha);
-			sprite_draw(static_animation_sprite, ui_shader_program, static_animation_frame);
+			sprite_draw(assets_global.static_animation_sprite, ui_shader_program, static_animation_frame);
 			glUniform1f(glGetUniformLocation(ui_shader_program, "alpha"), 1.0f);
 
 			if(blip_animation_frame < 9)
-				sprite_draw(blip_animation_sprite, ui_shader_program, blip_animation_frame);
+				sprite_draw(assets_global.blip_animation_sprite, ui_shader_program, blip_animation_frame);
 
-			sprite_draw(camera_border_sprite, ui_shader_program, 0);
-			sprite_draw(camera_map_sprite, ui_shader_program, blink_state);
+			sprite_draw(assets_game.camera_border_sprite, ui_shader_program, 0);
+			sprite_draw(assets_game.camera_map_sprite, ui_shader_program, blink_state);
 
-			camera_view_name_sprite.size[0] = camera_view_name_widths[camera_selected];
-			sprite_draw(camera_view_name_sprite, ui_shader_program, camera_selected);
+			assets_game.camera_view_name_sprite.size[0] = camera_view_name_widths[camera_selected];
+			sprite_draw(assets_game.camera_view_name_sprite, ui_shader_program, camera_selected);
 
 			for(uint8_t i = 0; i < 11; i++) {
 				vec2 camera_button_position_current;
 				glm_vec3_sub(camera_button_positions[i], (vec2){29.0f, 19.0f}, camera_button_position_current);
-				glm_vec2_copy(camera_button_position_current, camera_button_sprite.position);
-				sprite_draw(camera_button_sprite, ui_shader_program, blink_state * (camera_selected == i));
+				glm_vec2_copy(camera_button_position_current, assets_game.camera_button_sprite.position);
+				sprite_draw(assets_game.camera_button_sprite, ui_shader_program, blink_state * (camera_selected == i));
 
 				glm_vec3_sub(camera_button_positions[i], (vec2){22.0f, 12.0f}, camera_button_position_current);
-				glm_vec2_copy(camera_button_position_current, camera_button_name_sprite.position);
-				sprite_draw(camera_button_name_sprite, ui_shader_program, i);
+				glm_vec2_copy(camera_button_position_current, assets_game.camera_button_name_sprite.position);
+				sprite_draw(assets_game.camera_button_name_sprite, ui_shader_program, i);
 			}
 
 			if(blink_state)
-				sprite_draw(camera_recording_sprite, ui_shader_program, 0);
+				sprite_draw(assets_game.camera_recording_sprite, ui_shader_program, 0);
 
 			if(camera_selected == 9) {
-				sprite_draw(camera_disabled_sprite, ui_shader_program, 0);
+				sprite_draw(assets_game.camera_disabled_sprite, ui_shader_program, 0);
 			}
 		}
 
-		sprite_draw(power_usage_text_sprite, ui_shader_program, 0);
-		sprite_draw(power_usage_sprite, ui_shader_program, power_usage_value);
+		sprite_draw(assets_game.power_usage_text_sprite, ui_shader_program, 0);
+		sprite_draw(assets_game.power_usage_sprite, ui_shader_program, power_usage_value);
 
-		sprite_draw(power_left_sprite, ui_shader_program, 0);
-		sprite_draw(power_left_percent_sprite, ui_shader_program, 0);
+		sprite_draw(assets_game.power_left_sprite, ui_shader_program, 0);
+		sprite_draw(assets_game.power_left_percent_sprite, ui_shader_program, 0);
 
-		sprite_draw(night_text_sprite, ui_shader_program, 0);
-		sprite_draw(night_number_sprite, ui_shader_program, night_current - 1);
+		sprite_draw(assets_global.night_text_sprite, ui_shader_program, 0);
+		sprite_draw(assets_global.night_number_sprite, ui_shader_program, night_current - 1);
 
-		sprite_draw(hour_am_sprite, ui_shader_program, 0);
+		sprite_draw(assets_game.hour_am_sprite, ui_shader_program, 0);
 
 		hour_timer += time_delta / 90.0f;
 		if(hour_timer >= 6.0f) {
@@ -733,28 +642,28 @@ int main() {
 
 		if(hour_timer < 1.0f) {
 			for(uint8_t i = 0; i < 2; i++) {
-				glm_vec2_copy((vec2){1161 - (!i * 24), 29}, hour_number_sprite.position);
-				sprite_draw(hour_number_sprite, ui_shader_program, i);
+				glm_vec2_copy((vec2){1161 - (!i * 24), 29}, assets_game.hour_number_sprite.position);
+				sprite_draw(assets_game.hour_number_sprite, ui_shader_program, i);
 			}
 		} else {
-			glm_vec2_copy((vec2){1161, 29}, hour_number_sprite.position);
-			sprite_draw(hour_number_sprite, ui_shader_program, (uint8_t)hour_timer - 1);
+			glm_vec2_copy((vec2){1161, 29}, assets_game.hour_number_sprite.position);
+			sprite_draw(assets_game.hour_number_sprite, ui_shader_program, (uint8_t)hour_timer - 1);
 		}
 
 		{
 			uint8_t numbers_to_draw = (power_left_value >= 10.0f) + 1;
 			for(uint8_t i = 0; i < numbers_to_draw; i++) {
-				glm_vec2_copy((vec2){203 - (i * 18), 624}, power_left_number_sprite.position);
-				sprite_draw(power_left_number_sprite, ui_shader_program, (uint8_t)(power_left_value / powf(10, i)) % 10);
+				glm_vec2_copy((vec2){203 - (i * 18), 624}, assets_game.power_left_number_sprite.position);
+				sprite_draw(assets_game.power_left_number_sprite, ui_shader_program, (uint8_t)(power_left_value / powf(10, i)) % 10);
 			}
 		}
 
-		if((camera_state == CAM_STATE_CLOSED || camera_state == CAM_STATE_OPENED)) {
+		if((camera_state == CS_CLOSED || camera_state == CS_OPENED)) {
 			if(!camera_bar_hovering) {
-				sprite_draw(camera_flip_bar_sprite, ui_shader_program, 0);
+				sprite_draw(assets_game.camera_flip_bar_sprite, ui_shader_program, 0);
 			}
 		} else {
-			sprite_draw(camera_flip_animation_sprite, ui_shader_program, (uint16_t)(fabsf((10.0f * (camera_state == CAM_STATE_OPENING)) - ((camera_flip_timer * (1 / CAM_TIMER_INIT)) * 10.0f))));
+			sprite_draw(assets_game.camera_flip_animation_sprite, ui_shader_program, (uint16_t)(fabsf((10.0f * (camera_state == CS_OPENING)) - ((camera_flip_timer * (1 / CAM_TIMER_INIT)) * 10.0f))));
 		}
 
 		glfwSwapBuffers(window);
@@ -763,44 +672,11 @@ int main() {
 
 	/* destroy everything */
 	glDeleteFramebuffers(1, &fbo);
-
-	sprite_destroy(&blip_animation_sprite);
-
-	sprite_destroy(&static_animation_sprite);
-
-	sprite_destroy(&camera_disabled_sprite);
-	sprite_destroy(&camera_button_sprite);
-	sprite_destroy(&camera_recording_sprite);
-	sprite_destroy(&camera_map_sprite);
-	sprite_destroy(&camera_border_sprite);
-
-	sprite_destroy(&camera_flip_animation_sprite);
-	sprite_destroy(&camera_flip_bar_sprite);
-	sprite_destroy(&night_number_sprite);
-	sprite_destroy(&night_text_sprite);
-	sprite_destroy(&hour_number_sprite);
-	sprite_destroy(&hour_am_sprite);
-	sprite_destroy(&power_left_number_sprite);
-	sprite_destroy(&power_left_percent_sprite);
-	sprite_destroy(&power_left_sprite);
-	sprite_destroy(&power_usage_text_sprite);
-	sprite_destroy(&power_usage_sprite);
-	for(uint8_t i = 0; i < 2; i++) {
-		sprite_destroy(&door_button_sprites[i]);
-		sprite_destroy(&door_animation_sprites[i]);
-	}
-	sprite_destroy(&fan_animation_sprite);
-	sprite_destroy(&camera_view_name_sprite);
-	sprite_destroy(&camera_view_sprite);
-	sprite_destroy(&office_view_sprite);
-
+	assets_game_destroy(&assets_game);
+	assets_global_destroy(&assets_global);
 	glDeleteShader(sprite_shader_program);
 	glDeleteShader(ui_shader_program);
 	glDeleteShader(render_shader_program);
-
-	alDeleteSources(8, &fan_sound_source);
-	alDeleteBuffers(8, &fan_sound_buffer);
-
 	alcDestroyContext(sound_context);
 	alcCloseDevice(sound_device);
 

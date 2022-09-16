@@ -94,3 +94,15 @@ sound_source_t sound_source_create(sound_buffer_t sound_buffer, const float pitc
 
 	return sound_source;
 }
+
+sound_t sound_create(const char *path, const float pitch, const float gain, const float *position, const uint8_t loop) {
+	sound_t sound;
+	sound.buffer = sound_buffer_create(path);
+	sound.source = sound_source_create(sound.buffer, pitch, gain, position, loop);
+	return sound;
+}
+
+void sound_destroy(sound_t *sound) {
+	alDeleteSources(1, &sound->source);
+	alDeleteBuffers(1, &sound->buffer);
+}
