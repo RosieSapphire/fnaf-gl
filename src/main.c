@@ -1,6 +1,8 @@
+#include <cglm/vec3.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -11,13 +13,14 @@
 
 #include "assets.h"
 #include "file.h"
+#include "font.h"
 #include "texture.h"
 #include "sound.h"
 #include "shader.h"
 #include "mouse.h"
 #include "helpers.h"
 
-#define TIME_MULTIPLIER 				8
+#define TIME_MULTIPLIER 			32	
 
 #define WINDOW_WIDTH					1280
 #define WINDOW_HEIGHT					720
@@ -31,8 +34,6 @@
 #define CAM_TIMER_INIT 					0.35f
 
 static GLFWwindow *window;
-static ALCdevice *sound_device;
-static ALCcontext *sound_context;
 static uint8_t mouse_has_clicked = 0;
 
 static float scaled_update_timer = 0.0f;
@@ -163,63 +164,33 @@ int main() {
 	ui_shader_program = shader_create("resources/shaders/render_ui_vertex.glsl", "resources/shaders/render_ui_fragment.glsl");
 	sprite_shader_program = shader_create("resources/shaders/sprite_vertex.glsl", "resources/shaders/sprite_fragment.glsl");
 
-	{ /* set up audio engine */
-		#ifdef DEBUG
-			const char *sound_device_name;
-		#endif
-		sound_device = alcOpenDevice(NULL);
-		#ifdef DEBUG
-			if(!sound_device) {
-			    printf("ERROR: Audio Device fucked up.");
-			    return 1;
-			}
-		#endif
-		
-		sound_context = alcCreateContext(sound_device, NULL);
-		#ifdef DEBUG
-			if(!sound_context) {
-			    printf("ERROR: Audio Context fucked up.");
-			    return 1;
-			}
-		#endif
-		
-		#ifdef DEBUG
-		if(!alcMakeContextCurrent(sound_context)) {
-		    printf("ERROR: Making context fucked up.");
-		    return 1;
-		}
-		#else
-			alcMakeContextCurrent(sound_context);
-		#endif
-		
-		#ifdef DEBUG
-			sound_device_name = NULL;
-			if(alcIsExtensionPresent(sound_device, "ALC_ENUMERATE_ALL_EXT")) {
-			    sound_device_name = alcGetString(sound_device, ALC_ALL_DEVICES_SPECIFIER);
-			}
-			
-			if(!sound_device_name || alcGetError(sound_device) != AL_NO_ERROR) {
-			    sound_device_name = alcGetString(sound_device, ALC_DEVICE_SPECIFIER);
-			}
-			printf("SOUND DEVICE: %s\n", sound_device_name);
-		#endif
-	}
+	sound_system_create();
 
 	/* load assets */
 	assets_global = assets_global_create();
 	switch(game_state) {
 		case GS_TITLE:
 			assets_title = assets_title_create();
+			sound_play(assets_global.blip_sound);
+			sound_play(assets_global.static_sound);
+			sound_play(assets_title.music);
 			break;
 
 		case GS_GAME:
 			assets_game = assets_game_create();
-			alSourcePlay(assets_game.fan_sound.source);
-			alSourcef(assets_game.fan_sound.source, AL_GAIN, 0.25f);
-			alSourcePlay(assets_game.light_sound.source);
+			sound_play(assets_game.fan_sound);
+			sound_play(assets_game.light_sound);
+
+			camera_state = CS_CLOSED;
+			camera_selected = 0;
+			door_button_flags = 0;
+			hour_timer = 0.0f;
+			power_left_value = 99.9f;
+			office_look_current = -160.0f;
+			night_current++;
 			break;
 	}
-
+	assets_print_loaded();
 
 	/* set up audio listener */
 	alListeneri(AL_DISTANCE_MODEL, AL_INVERSE_DISTANCE_CLAMPED);
@@ -315,30 +286,36 @@ int main() {
 			game_state = !game_state;
 			switch(game_state) {
 				case GS_TITLE:
+					sound_stop(assets_game.light_sound);
+					sound_stop(assets_game.fan_sound);
 					assets_game_destroy(&assets_game);
+
 					assets_title = assets_title_create();
-					alSourcePlay(assets_global.blip_sound.source);
-					alSourcePlay(assets_global.static_sound.source);
-					alSourcePlay(assets_title.music.source);
+					sound_play(assets_global.blip_sound);
+					sound_play(assets_global.static_sound);
+					sound_play(assets_title.music);
 					break;
 
 				case GS_GAME:
+					sound_stop(assets_global.blip_sound);
+					sound_stop(assets_global.static_sound);
 					assets_title_destroy(&assets_title);
+
 					assets_game = assets_game_create();
+					sound_play(assets_game.fan_sound);
+					sound_play(assets_game.light_sound);
+
 					camera_state = CS_CLOSED;
 					camera_selected = 0;
 					door_button_flags = 0;
 					hour_timer = 0.0f;
 					power_left_value = 99.9f;
 					office_look_current = -160.0f;
-					alSourceStop(assets_global.static_sound.source);
-					alSourcePlay(assets_game.fan_sound.source);
-					alSourcef(assets_game.fan_sound.source, AL_GAIN, 0.25f);
-					alSourcePlay(assets_game.light_sound.source);
 					night_current++;
 					break;
 			}
 		    space_pressed = 1;
+			assets_print_loaded();
 		}
 		
 		if(glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE) {
@@ -346,7 +323,6 @@ int main() {
 		}
 
 		mouse_get_position(window, mouse_position);
-		// assets_print_loaded(time_delta);
 
 		/* update all animations */
 		fan_animation_frame += ticks;
@@ -392,14 +368,17 @@ int main() {
 			}
 			static_animation_alpha = 1.0f - ((150.0f + (rand() % 50) + static_animation_rand_value) / 255.0f);
 
-			alSourcef(assets_game.light_sound.source, AL_GAIN, light_buzz_volume_new);
+			sound_set_gain(assets_game.light_sound, light_buzz_volume_new);
 			scaled_update_timer = 0.0f;
 		}
 
 		glm_mat4_identity(matrix_view);
 		switch(game_state) {
 			case GS_TITLE:
-
+				glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+				glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+				glClear(GL_COLOR_BUFFER_BIT);
+				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 				break;
 
 			case GS_GAME: {
@@ -447,19 +426,19 @@ int main() {
 							switch(camera_state) {
 								case CS_CLOSED:
 									camera_state = CS_OPENING;
-									alSourceStop(assets_game.camera_close_sound.source);
-									alSourcePlay(assets_game.camera_open_sound.source);
-									alSourcePlay(assets_game.camera_scan_sound.source);
+									sound_stop(assets_game.camera_close_sound);
+									sound_play(assets_game.camera_open_sound);
+									sound_play(assets_game.camera_scan_sound);
 
 									break;
 
 								case CS_OPENED:
 									camera_state = CS_CLOSING;
-									alSourceStop(assets_game.camera_open_sound.source);
-									alSourceStop(assets_game.camera_scan_sound.source);
-									alSourcePlay(assets_game.camera_close_sound.source);
+									sound_stop(assets_game.camera_open_sound);
+									sound_stop(assets_game.camera_scan_sound);
+									sound_play(assets_game.camera_close_sound);
 
-									alSourcef(assets_game.fan_sound.source, AL_GAIN, 0.25f);
+									sound_set_gain(assets_game.fan_sound, 0.25f);
 									break;
 
 								default:
@@ -482,9 +461,9 @@ int main() {
 
 					if(camera_state == CS_OPENED && camera_state_old != CS_OPENED) {
 						door_button_flags &= DOOR_BUTTON_BOTH_DOORS_FLAG;
-						alSourcePlay(assets_global.blip_sound.source);
+						sound_play(assets_global.blip_sound);
 						blip_animation_frame = 0;
-						alSourcef(assets_game.fan_sound.source, AL_GAIN, 0.1f);
+						sound_set_gain(assets_game.fan_sound, 0.1f);
 					}
 				}
 
@@ -523,7 +502,7 @@ int main() {
 							if(!((uint8_t)door_frame_timers[i]) || (uint8_t)door_frame_timers[i] == 28) {
 								if(mouse_inside_box(window, door_button_boxes[i], mouse_offset)) {
 									door_button_flags ^= door_button_bit_mask;
-									alSourcePlay(assets_game.door_sound.source);
+									sound_play(assets_game.door_sound);
 								}
 							}
 
@@ -532,8 +511,8 @@ int main() {
 
 						/* pressing Freddy's nose */
 						if(mouse_inside_box(window, (ivec4){674, 682, 236, 244}, mouse_offset)) {
-							alSourceStop(assets_game.freddy_nose_sound.source);
-							alSourcePlay(assets_game.freddy_nose_sound.source);
+							sound_stop(assets_game.freddy_nose_sound);
+							sound_play(assets_game.freddy_nose_sound);
 						}
 					} else {
 						/* selecting different cameras */
@@ -545,7 +524,7 @@ int main() {
 							glm_ivec4_sub(camera_button_box_current, (ivec4){29, -31, 19, -21}, camera_button_box_current);
 
 							if(mouse_inside_box(window, camera_button_box_current, 0.0f)) {
-								alSourcePlay(assets_global.blip_sound.source);
+								sound_play(assets_global.blip_sound);
 								blip_animation_frame = 0;
 								camera_selected = i;
 							}
@@ -610,8 +589,6 @@ int main() {
 					const uint8_t camera_selected_offsets[11] = { 0, 7, 13, 18, 54, 60, 62, 68, 77, 0, 81 };
 					if(camera_selected != 9) {
 						sprite_draw(assets_game.camera_view_sprite, sprite_shader_program, camera_selected_offsets[camera_selected] + ((light_flicker <= 3) * camera_selected == 3));
-					} else {
-						sprite_draw(assets_global.black_sprite, sprite_shader_program, 0);
 					}
 				}
 
@@ -711,8 +688,29 @@ int main() {
 						sprite_draw(assets_game.camera_flip_bar_sprite, ui_shader_program, 0);
 					}
 				} else {
-					sprite_draw(assets_game.camera_flip_animation_sprite, ui_shader_program, (uint16_t)(fabsf((10.0f * (camera_state == CS_OPENING)) - ((camera_flip_timer * (1 / CAM_TIMER_INIT)) * 10.0f))));
+					sprite_draw(assets_game.camera_flip_animation_sprite, ui_shader_program, (uint16_t)(clampf(fabsf((10.0f * (camera_state == CS_OPENING)) - ((camera_flip_timer * (1 / CAM_TIMER_INIT)) * 10.0f)), 0.0f, 10.0f)));
 				}
+
+				#ifdef DEBUG
+				{
+					// char *debug_mode = "DEBUG MODE";
+					char buffers[9][256];
+					sprintf(buffers[0], "DEBUG MODE");
+					sprintf(buffers[1], "    Office Look: %.0f", (double)office_look_current);
+					sprintf(buffers[2], "    Camera Look: %.0f", (double)camera_look_current);
+					sprintf(buffers[3], "    Door Flags: %u%u%u%u", (door_button_flags) & 1, (door_button_flags >> 1) & 1, (door_button_flags >> 2) & 1, (door_button_flags >> 3) & 1);
+					sprintf(buffers[4], "    Camera Flip State: %u", camera_state);
+					sprintf(buffers[5], "    Camera Selected: %u", camera_selected);
+					sprintf(buffers[6], "    Night Progress: %i%%", (int32_t)((hour_timer / 6.0f) * 100.0f));
+					sprintf(buffers[7], "    Time Passed: %.2f", time_now);
+					sprintf(buffers[8], "    FPS: %.0f", (double)(1.0f / time_delta));
+
+					for(uint8_t i = 0; i < 9; i++) {
+						font_draw(assets_global.debug_font, buffers[i], (vec2){64.0f, WINDOW_HEIGHT + 256.0f - (48.0f * i)}, GLM_VEC3_ONE, 0.6f);
+					}
+				}
+				#endif
+
 				break;
 			}
 		}
@@ -726,11 +724,11 @@ int main() {
 	assets_game_destroy(&assets_game);
 	assets_title_destroy(&assets_title);
 	assets_global_destroy(&assets_global);
+	sound_system_destroy();
+
 	glDeleteShader(sprite_shader_program);
 	glDeleteShader(ui_shader_program);
 	glDeleteShader(render_shader_program);
-	alcDestroyContext(sound_context);
-	alcCloseDevice(sound_device);
 
 	glfwTerminate();
 	return 0;

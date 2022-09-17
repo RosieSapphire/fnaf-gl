@@ -1,57 +1,78 @@
 #include "assets.h"
+#include "font.h"
 #include "sound.h"
 
-static uint8_t global_loaded;
-static uint8_t game_loaded;
+#include <assert.h>
+
+static uint8_t global_loaded = 0;
+static uint8_t title_loaded = 0;
+static uint8_t game_loaded = 0;
 
 assets_global_t assets_global_create() {
 	assets_global_t a;
+	assert(!global_loaded);
+
+	font_shader_create();
 	a.night_text_sprite = sprite_create((vec2){1148, 74}, (vec2){63, 14}, "resources/graphics/ui/night/night.png", 1);
 	a.night_number_sprite = sprite_create((vec2){1223, 72}, (vec2){14, 17}, "resources/graphics/ui/night/", 7);
-
 	a.static_animation_sprite = sprite_create(GLM_VEC2_ZERO, (vec2){1280.0f, 720.0f}, "resources/graphics/general/static/", 8);
 	a.blip_animation_sprite = sprite_create(GLM_VEC2_ZERO, (vec2){1280.0f, 720.0f}, "resources/graphics/general/blip/", 9);
-
 	a.black_sprite = sprite_create(GLM_VEC2_ZERO, (vec2){1600.0f, 720.0f}, "resources/graphics/black.png", 1);
 
 	a.blip_sound = sound_create("resources/audio/sounds/blip.wav", 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
 	a.static_sound = sound_create("resources/audio/sounds/static.wav", 1.0f, 1.0f, GLM_VEC3_ZERO, 0);
+
+	a.debug_font = font_create("resources/fonts/minecraftia.ttf");
 
 	global_loaded = 1;
 	return a;
 }
 
 void assets_global_destroy(assets_global_t *a) {
-	sprite_destroy(&a->night_text_sprite);
-	sprite_destroy(&a->night_number_sprite);
-	
-	sprite_destroy(&a->static_animation_sprite);
-	sprite_destroy(&a->blip_animation_sprite);
+	if(!global_loaded)
+		return;
+
+	font_destroy(&a->debug_font);
+	font_shader_destroy();
+
+	sound_destroy(&a->static_sound);
+	sound_destroy(&a->blip_sound);
 
 	sprite_destroy(&a->black_sprite);
-
-	sound_destroy(&a->blip_sound);
-	sound_destroy(&a->static_sound);
+	sprite_destroy(&a->blip_animation_sprite);
+	sprite_destroy(&a->static_animation_sprite);
+	sprite_destroy(&a->night_number_sprite);
+	sprite_destroy(&a->night_text_sprite);
 
 	global_loaded = 0;
 }
 
 assets_title_t assets_title_create(void) {
 	assets_title_t a;
+	assert(!title_loaded);
+
 	a.music = sound_create("resources/audio/music/title-music.wav", 1.0f, 1.0f, GLM_VEC3_ZERO, 1);
+
+	title_loaded = 1;
 	return a;
 }
 
 void assets_title_destroy(assets_title_t *a) {
+	if(!title_loaded)
+		return;
+
 	sound_destroy(&a->music);
+
+	title_loaded = 0;
 }
 
 assets_game_t assets_game_create() {
 	assets_game_t a;
 	vec2 door_positions[2] = {{72.0f, -1.0f}, {1270.0f, -2.0f}};
-	for(uint8_t i = 0; i < 2; i++) {
+	assert(!game_loaded);
+
+	for(uint8_t i = 0; i < 2; i++)
 		a.door_animation_sprites[i] = sprite_create(door_positions[i], (vec2){223.0f, 720.0f}, "resources/graphics/office/doors/", 15);
-	}
 	a.office_view_sprite = sprite_create(GLM_VEC2_ZERO, (vec2){1600.0f, 720.0f}, "resources/graphics/office/states/", 5);
 	a.camera_view_sprite = sprite_create(GLM_VEC2_ZERO, (vec2){1600.0f, 720.0f}, "resources/graphics/camera/", 85);
 	a.camera_view_name_sprite = sprite_create((vec2){832.0f, 292.0f}, (vec2){239.0f, 26.0f}, "resources/graphics/ui/camera/map/names/", 11);
@@ -88,40 +109,44 @@ assets_game_t assets_game_create() {
 }
 
 void assets_game_destroy(assets_game_t *a) {
-	for(uint8_t i = 0; i < 2; i++) {
-		sprite_destroy(&a->door_animation_sprites[i]);
-		sprite_destroy(&a->door_button_sprites[i]);
-	}
-	sprite_destroy(&a->office_view_sprite);
-	sprite_destroy(&a->camera_view_name_sprite);
-	sprite_destroy(&a->fan_animation_sprite);
-	sprite_destroy(&a->power_usage_sprite);
-	sprite_destroy(&a->power_usage_text_sprite);
-	sprite_destroy(&a->power_left_sprite);
-	sprite_destroy(&a->power_left_percent_sprite);
-	sprite_destroy(&a->power_left_number_sprite);
-	sprite_destroy(&a->hour_am_sprite);
-	sprite_destroy(&a->hour_number_sprite);
-	sprite_destroy(&a->camera_flip_bar_sprite);
-	sprite_destroy(&a->camera_flip_animation_sprite);
-	sprite_destroy(&a->camera_border_sprite);
-	sprite_destroy(&a->camera_map_sprite);
-	sprite_destroy(&a->camera_recording_sprite);
-	sprite_destroy(&a->camera_button_sprite);
-	sprite_destroy(&a->camera_button_name_sprite);
-	sprite_destroy(&a->camera_disabled_sprite);
+	if(!game_loaded)
+		return;
 
-	sound_destroy(&a->fan_sound);
-	sound_destroy(&a->light_sound);
-	sound_destroy(&a->door_sound);
-	sound_destroy(&a->freddy_nose_sound);
-	sound_destroy(&a->camera_open_sound);
-	sound_destroy(&a->camera_scan_sound);
 	sound_destroy(&a->camera_close_sound);
+	sound_destroy(&a->camera_scan_sound);
+	sound_destroy(&a->camera_open_sound);
+	sound_destroy(&a->freddy_nose_sound);
+	sound_destroy(&a->door_sound);
+	sound_destroy(&a->light_sound);
+	sound_destroy(&a->fan_sound);
+
+	sprite_destroy(&a->camera_disabled_sprite);
+	sprite_destroy(&a->camera_button_name_sprite);
+	sprite_destroy(&a->camera_button_sprite);
+	sprite_destroy(&a->camera_recording_sprite);
+	sprite_destroy(&a->camera_map_sprite);
+	sprite_destroy(&a->camera_border_sprite);
+	sprite_destroy(&a->camera_flip_animation_sprite);
+	sprite_destroy(&a->camera_flip_bar_sprite);
+	sprite_destroy(&a->hour_number_sprite);
+	sprite_destroy(&a->hour_am_sprite);
+	sprite_destroy(&a->power_left_number_sprite);
+	sprite_destroy(&a->power_left_percent_sprite);
+	sprite_destroy(&a->power_left_sprite);
+	sprite_destroy(&a->power_usage_text_sprite);
+	sprite_destroy(&a->power_usage_sprite);
+	sprite_destroy(&a->door_button_sprites[1]);
+	sprite_destroy(&a->door_button_sprites[0]);
+	sprite_destroy(&a->fan_animation_sprite);
+	sprite_destroy(&a->camera_view_name_sprite);
+	sprite_destroy(&a->camera_view_sprite);
+	sprite_destroy(&a->office_view_sprite);
+	sprite_destroy(&a->door_animation_sprites[1]);
+	sprite_destroy(&a->door_animation_sprites[0]);
 
 	game_loaded = 0;
 }
 
-void assets_print_loaded(const float time_delta) {
-	printf("GLOBAL: %u, GAME: %u, FPS: %.0f\n", global_loaded, game_loaded, (double)(1.0f / time_delta));
+void assets_print_loaded() {
+	printf("GLOBAL: %u, TITLE: %u, GAME: %u\n", global_loaded, title_loaded, game_loaded);
 }

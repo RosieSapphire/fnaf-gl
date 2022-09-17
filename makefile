@@ -1,21 +1,21 @@
 CC=clang
 INC=-Iinclude -I/usr/include
-LIB=-lglfw -lopenal -lsndfile -lm
+LIB=-lglfw -lopenal -lsndfile -lfreetype -lm
 CORES=-j8
 
-CFLAGS=-std=c99
+CFLAGS=-std=c99 -Wall -Wextra -Weverything
 
-SRC=main.c glad.c shader.c sprite.c sound.c mouse.c helpers.c file.c texture.c assets.c
-OBJ=main.o glad.o shader.o sprite.o sound.o mouse.o helpers.o file.o texture.o assets.o
+SRC=main.c glad.c shader.c sprite.c sound.c mouse.c helpers.c file.c texture.c assets.c font.c
+OBJ=main.o glad.o shader.o sprite.o sound.o mouse.o helpers.o file.o texture.o assets.o font.o
 
 BIN=five-nights-at-freddys
 
 all: release
 
-release: CFLAGS += -O2 -Wall -Wextra -Weverything
+release: CFLAGS += -O2 
 release: $(BIN)
 
-debug: CFLAGS += -ggdb3 -Wall -Wextra -Weverything -Werror -D DEBUG
+debug: CFLAGS += -Og -ggdb3 -Werror -D DEBUG
 debug: $(BIN)
 
 run:

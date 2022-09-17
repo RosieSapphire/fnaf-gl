@@ -3,6 +3,7 @@
 
 #include "sprite.h"
 #include "sound.h"
+#include "font.h"
 
 typedef struct {
 	sprite_t night_text_sprite;
@@ -15,6 +16,8 @@ typedef struct {
 
 	sound_t blip_sound;
 	sound_t static_sound;
+
+	font_t debug_font;
 } assets_global_t;
 
 typedef struct {
@@ -63,6 +66,6 @@ void assets_title_destroy(assets_title_t *a);
 assets_game_t assets_game_create(void);
 void assets_game_destroy(assets_game_t *a);
 
-void assets_print_loaded(const float time_delta);
+void assets_print_loaded(void);
 
 #endif
