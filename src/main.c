@@ -17,7 +17,6 @@
 #include "texture.h"
 #include "sound.h"
 #include "shader.h"
-#include "mouse.h"
 #include "helpers.h"
 
 #ifdef DEBUG
@@ -58,7 +57,7 @@ static uint8_t blip_animation_frame = 0;
 static uint8_t static_animation_frame = 0;
 static uint8_t static_animation_rand_timer = 60;
 static uint8_t static_animation_rand_value = 0;
-static float static_animation_alpha = 0.0f;
+static float static_animation_alpha = 0.5f;
 
 enum {
 	CS_CLOSED = 0,
@@ -81,6 +80,13 @@ static uint8_t camera_state = CS_CLOSED;
 static uint8_t camera_selected = 0;
 static float camera_flip_timer = CAM_TIMER_INIT;
 
+static float title_timer1 = 0.0f;
+static float title_timer2 = 0.0f;
+static float title_blip_alpha = 0.0f;
+static uint8_t title_blip_visible = 0.0f;
+static float title_face_alpha = 0.0f;
+static uint8_t title_face_glitch = 0;
+
 static uint8_t light_flicker;
 
 static float office_look_current = -160.0f;
@@ -90,6 +96,10 @@ static float camera_look_current = 0.0f;
 static float camera_look_hold_timer = 0.0f;
 static uint8_t camera_look_state = 0;
 
+static uint8_t menu_option_selected = 0;
+static uint8_t menu_option_hover_old = 0;
+static float menu_selector_ypos = 404.0f;
+
 static mat4 matrix_projection;
 
 enum {
@@ -97,7 +107,7 @@ enum {
 	GS_GAME,
 };
 
-static uint8_t game_state = GS_GAME;
+static uint8_t game_state = GS_TITLE;
 
 int main() {
 	/* load GLFW */
@@ -176,6 +186,8 @@ int main() {
 			sound_play(assets_global.blip_sound);
 			sound_play(assets_global.static_sound);
 			sound_play(assets_title.music);
+			office_look_current = 0.0f;
+			camera_look_current = 0.0f;
 			break;
 
 		case GS_GAME:
@@ -189,7 +201,7 @@ int main() {
 			hour_timer = 0.0f;
 			power_left_value = 99.9f;
 			office_look_current = -160.0f;
-			night_current++;
+			camera_look_current = 0.0f;
 			break;
 	}
 	assets_print_loaded();
@@ -298,6 +310,8 @@ int main() {
 					sound_play(assets_global.blip_sound);
 					sound_play(assets_global.static_sound);
 					sound_play(assets_title.music);
+					office_look_current = 0.0f;
+					camera_look_current = 0.0f;
 					break;
 
 				case GS_GAME:
@@ -315,6 +329,7 @@ int main() {
 					hour_timer = 0.0f;
 					power_left_value = 99.9f;
 					office_look_current = -160.0f;
+					camera_look_current = 0.0f;
 					night_current++;
 					break;
 			}
@@ -343,6 +358,8 @@ int main() {
 		}
 
 		scaled_update_timer += time_delta;
+		title_timer1 += time_delta;
+		title_timer2 += time_delta;
 		if(scaled_update_timer > ANIMATION_FRAMETIME) {
 			const uint8_t static_animation_frame_old = static_animation_frame;
 
@@ -370,20 +387,148 @@ int main() {
 				static_animation_rand_value = ((uint8_t)rand() % 3) * 15;
 				static_animation_rand_timer = 60;
 			}
-			static_animation_alpha = 1.0f - ((150.0f + (rand() % 50) + static_animation_rand_value) / 255.0f);
+			static_animation_alpha = 1.0f - ((((game_state == GS_TITLE) ? 100.0f : 150.0f) + (rand() % 50) + static_animation_rand_value) / 255.0f);
 
 			sound_set_gain(assets_game.light_sound, light_buzz_volume_new);
 			scaled_update_timer = 0.0f;
+
+			/* title glitchy blip flicker */
+			if(title_timer1 > 0.08f) {
+				title_blip_alpha = 1.0f - ((float)((rand() % 100) + 100) / 255.0f);
+				title_face_glitch = (uint8_t)(rand() % 100);
+				title_timer1 = 0.0f;
+			}
+
+			if(title_timer2 > 0.3f) {
+				title_blip_visible = !(rand() % 3);
+				title_face_alpha = 1.0f - ((float)(rand() % 250) / 255.0f);
+				title_timer2 = 0.0f;
+			}
 		}
 
 		glm_mat4_identity(matrix_view);
 		switch(game_state) {
-			case GS_TITLE:
+			case GS_TITLE: {
+				const uint16_t glitchy_blip_frame = (uint16_t)(blink_timer_get_tick((float)time_now, 10.0f, 60.0f, 8.0f));
+
+				/* updating */
+				assets_title.scanline_sprite.position[1] = fmod2((float)time_now * 30.0f, 752.0f) - 32.0f;
+
+				/* drawing */
 				glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 				glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 				glClear(GL_COLOR_BUFFER_BIT);
-				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+				glUseProgram(sprite_shader_program);
+				glUniformMatrix4fv(glGetUniformLocation(sprite_shader_program, "view"), 1, GL_FALSE, (const GLfloat *)matrix_view);
+				glUniformMatrix4fv(glGetUniformLocation(sprite_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
+				glUniform1f(glGetUniformLocation(sprite_shader_program, "alpha"), 1.0f);
+				glUniform1i(glGetUniformLocation(sprite_shader_program, "follow_camera"), 1);
+
+				glUniform1f(glGetUniformLocation(sprite_shader_program, "alpha"), title_face_alpha);
+				sprite_draw(assets_title.freddy_face_sprite, sprite_shader_program, title_face_glitch * (title_face_glitch < 4));
+
+				glUniform1f(glGetUniformLocation(sprite_shader_program, "alpha"), 1.0f);
+				sprite_draw(assets_title.name_sprite, sprite_shader_program, 0);
+
+				glUniform1f(glGetUniformLocation(sprite_shader_program, "alpha"), 0.2156862f);
+				sprite_draw(assets_title.scanline_sprite, sprite_shader_program, 0);
+				glUniform1f(glGetUniformLocation(sprite_shader_program, "alpha"), 1.0f);
+
+				for(uint8_t i = 0; i < 2; i++) {
+					vec4 copyright_boxes[2] = {
+						{1044.0f, 691.0f, 226.0f, 14.0f},
+						{1044.0f, 668.0f, 225.0f, 19.0f},
+					};
+
+					glm_vec2((float *)copyright_boxes[i], assets_title.copyright_sprites.position);
+					glm_vec2((float *)copyright_boxes[i] + 2, assets_title.copyright_sprites.size);
+					sprite_draw(assets_title.copyright_sprites, sprite_shader_program, i);
+				}
+
+				{
+					uint8_t menu_option_hover = 0;
+					uint8_t menu_option_selected_old = menu_option_selected;
+					ivec4 menu_option_boxes[4] = {
+						{174, 404, 203, 33},
+						{174, 475, 204, 34},
+						{174, 549, 227, 44},
+						{174, 617, 306, 44},
+					};
+
+					for(uint8_t i = 0; i < 4; i++) {
+						if(mouse_inside_box(mouse_position, menu_option_boxes[i], 0.0f)) {
+							menu_option_hover++;
+							menu_option_selected = i;
+							menu_selector_ypos = (float)menu_option_boxes[i][1];
+							break;
+						}
+					}
+
+					if(menu_option_hover && (menu_option_hover != menu_option_hover_old) && (menu_option_selected != menu_option_selected_old)) {
+						sound_play(assets_global.blip_sound);
+					}
+					menu_option_hover_old = menu_option_hover;
+
+					for(uint8_t i = 0; i < 4; i++) {
+						assets_title.menu_option_sprites.position[0] = (float)menu_option_boxes[i][0];
+						assets_title.menu_option_sprites.position[1] = (float)menu_option_boxes[i][1];
+						assets_title.menu_option_sprites.size[0] = (float)menu_option_boxes[i][2];
+						assets_title.menu_option_sprites.size[1] = (float)menu_option_boxes[i][3];
+						sprite_draw(assets_title.menu_option_sprites, sprite_shader_program, i);
+					}
+
+					glm_vec2_copy((vec2){111.0f, menu_selector_ypos + 4.0f}, assets_title.menu_option_sprites.position);
+					glm_vec2_copy((vec2){43.0f, 26.0f}, assets_title.menu_option_sprites.size);
+					sprite_draw(assets_title.menu_option_sprites, sprite_shader_program, 5);
+				}
+
+				if(title_blip_visible) {
+					glUniform1f(glGetUniformLocation(sprite_shader_program, "alpha"), title_blip_alpha);
+					sprite_draw(assets_title.glitchy_blip, sprite_shader_program, glitchy_blip_frame);
+					glUniform1f(glGetUniformLocation(sprite_shader_program, "alpha"), 1.0f);
+				}
+
+				glBindFramebuffer(GL_FRAMEBUFFER, 0);
+				glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+				glClear(GL_COLOR_BUFFER_BIT);
+
+				glUseProgram(render_shader_program);
+				glUniform1i(glGetUniformLocation(render_shader_program, "use_perspective"), 0);
+
+				glActiveTexture(GL_TEXTURE0);
+				glBindTexture(GL_TEXTURE_2D, render_texture);
+				glUniform1i(glGetUniformLocation(render_shader_program, "render_texture"), 0);
+
+				glActiveTexture(GL_TEXTURE1);
+				glBindTexture(GL_TEXTURE_2D, assets_global.static_animation_sprite.textures[static_animation_frame]);
+				glUniform1i(glGetUniformLocation(render_shader_program, "overlay_texture"), 1);
+				glUniform1f(glGetUniformLocation(render_shader_program, "overlay_alpha"), static_animation_alpha);
+
+				glBindVertexArray(render_vao);
+				glDrawArrays(GL_TRIANGLES, 0, 6);
+
+				#ifdef DEBUG
+				{
+					char buffers[10][256];
+					sprintf(buffers[0], "DEBUG MODE");
+					sprintf(buffers[1], "    Scanline Y-Pos: %.0f", (double)assets_title.scanline_sprite.position[1]);
+					sprintf(buffers[2], "    Blip Alpha: %.2f", (double)title_blip_alpha);
+					sprintf(buffers[3], "    Blip Visible: %u", title_blip_visible);
+					sprintf(buffers[4], "    Static Frame: %.0f", (double)static_animation_frame);
+					sprintf(buffers[5], "    Static Alpha: %.2f", (double)static_animation_alpha);
+					sprintf(buffers[6], "    Mouse Position: (%.0f, %.0f)\n", (double)mouse_position[0], (double)mouse_position[1]);
+					sprintf(buffers[7], "    Option Selected: %u\n", menu_option_selected);
+					sprintf(buffers[8], "    Time Passed: %.2f", time_now);
+					sprintf(buffers[9], "    FPS: %.0f", (1.0 / (double)time_delta));
+
+					for(uint8_t i = 0; i < 10; i++)
+						font_draw(assets_global.debug_font, buffers[i], (vec2){WINDOW_WIDTH - 64.0f, WINDOW_HEIGHT + 256.0f - (48.0f * i)}, GLM_VEC3_ONE, 0.6f);
+				}
+				#endif
+
 				break;
+			}
 
 			case GS_GAME: {
 				vec2 camera_button_positions[11] = {
@@ -423,7 +568,7 @@ int main() {
 				/* camera flipping */
 				{
 					const uint8_t camera_state_old = camera_state;
-					if(mouse_inside_box(window, (ivec4){75, 75 + 792, 653, 653 + 67}, 0.0f)) {
+					if(mouse_inside_box(mouse_position, (ivec4){75, 75 + 792, 653, 653 + 67}, 0.0f)) {
 						if(!camera_bar_hovering) {
 							camera_bar_hovering = 1;
 
@@ -504,17 +649,17 @@ int main() {
 						for(uint8_t i = 0; i < 2; i++) {
 							uint8_t door_button_bit_mask = (uint8_t)(DOOR_BUTTON_DOOR_FLAG << (i * 2));
 							if(!((uint8_t)door_frame_timers[i]) || (uint8_t)door_frame_timers[i] == 28) {
-								if(mouse_inside_box(window, door_button_boxes[i], mouse_offset)) {
+								if(mouse_inside_box(mouse_position, door_button_boxes[i], mouse_offset)) {
 									door_button_flags ^= door_button_bit_mask;
 									sound_play(assets_game.door_sound);
 								}
 							}
 
-							door_button_flags ^= (door_button_bit_mask >> 1) * mouse_inside_box(window, door_button_boxes[i + 2], mouse_offset);
+							door_button_flags ^= (door_button_bit_mask >> 1) * mouse_inside_box(mouse_position, door_button_boxes[i + 2], mouse_offset);
 						}
 
 						/* pressing Freddy's nose */
-						if(mouse_inside_box(window, (ivec4){674, 682, 236, 244}, mouse_offset)) {
+						if(mouse_inside_box(mouse_position, (ivec4){674, 682, 236, 244}, mouse_offset)) {
 							sound_stop(assets_game.freddy_nose_sound);
 							sound_play(assets_game.freddy_nose_sound);
 						}
@@ -527,7 +672,7 @@ int main() {
 							}
 							glm_ivec4_sub(camera_button_box_current, (ivec4){29, -31, 19, -21}, camera_button_box_current);
 
-							if(mouse_inside_box(window, camera_button_box_current, 0.0f)) {
+							if(mouse_inside_box(mouse_position, camera_button_box_current, 0.0f)) {
 								sound_play(assets_global.blip_sound);
 								blip_animation_frame = 0;
 								camera_selected = i;
@@ -576,6 +721,7 @@ int main() {
 				glUseProgram(sprite_shader_program);
 				glUniformMatrix4fv(glGetUniformLocation(sprite_shader_program, "view"), 1, GL_FALSE, (const GLfloat *)matrix_view);
 				glUniformMatrix4fv(glGetUniformLocation(sprite_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
+				glUniform1i(glGetUniformLocation(sprite_shader_program, "follow_camera"), 0);
 
 				if(camera_state != CS_OPENED) {
 					sprite_draw(assets_game.office_view_sprite, sprite_shader_program, office_view_sprite_state);
@@ -601,9 +747,11 @@ int main() {
 				glClear(GL_COLOR_BUFFER_BIT);
 
 				glUseProgram(render_shader_program);
+				glUniform1i(glGetUniformLocation(render_shader_program, "use_perspective"), 1);
+				glUniform1i(glGetUniformLocation(render_shader_program, "render_texture"), 0);
+				glUniform1f(glGetUniformLocation(render_shader_program, "overlay_alpha"), 1.0f);
 				glActiveTexture(GL_TEXTURE0);
 				glBindTexture(GL_TEXTURE_2D, render_texture);
-				glUniform1i(glGetUniformLocation(render_shader_program, "render_texture"), 0);
 				glBindVertexArray(render_vao);
 				glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -616,8 +764,8 @@ int main() {
 				if(camera_state == CS_OPENED) {
 					uint8_t blink_state_dot;
 					uint8_t blink_state_buttons;
-					float blink_timer_dot = fmod2((float)time_now * ((2.0f / (100.0f * ANIMATION_FRAMETIME)) / 2.0f), 1.0f);
-					float blink_timer_buttons = fmod2((float)time_now * ((3.0f / (100.0f * ANIMATION_FRAMETIME)) / 2.0f), 1.0f);
+					float blink_timer_dot = blink_timer_get_tick((float)time_now, 2.0f, 60.0f, 1.0f);
+					float blink_timer_buttons = blink_timer_get_tick((float)time_now, 3.0f, 60.0f, 1.0f);
 					const float camera_view_name_widths[11] = { 217.0f, 239.0f, 228.0f, 192.0f, 305.0f, 284.0f, 192.0f, 305.0f, 195.0f, 151.0f, 196.0f };
 	
 					blink_state_dot = blink_timer_dot < 0.5f;
@@ -703,7 +851,6 @@ int main() {
 
 				#ifdef DEBUG
 				{
-					// char *debug_mode = "DEBUG MODE";
 					char buffers[9][256];
 					sprintf(buffers[0], "DEBUG MODE");
 					sprintf(buffers[1], "    Office Look: %.0f", (double)office_look_current);

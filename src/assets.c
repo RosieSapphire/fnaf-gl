@@ -1,8 +1,10 @@
 #include "assets.h"
 #include "font.h"
 #include "sound.h"
+#include "sprite.h"
 
 #include <assert.h>
+#include <cglm/vec2.h>
 
 static uint8_t global_loaded = 0;
 static uint8_t title_loaded = 0;
@@ -51,6 +53,13 @@ assets_title_t assets_title_create(void) {
 	assets_title_t a;
 	assert(!title_loaded);
 
+	a.name_sprite = sprite_create((vec2){175.0f, 79.0f}, (vec2){201.0f, 212.0f}, "resources/graphics/title/title-text.png", 1);
+	a.scanline_sprite = sprite_create(GLM_VEC2_ZERO, (vec2){1280.0f, 32.0f}, "resources/graphics/general/scanline.png", 1);
+	a.glitchy_blip = sprite_create(GLM_VEC2_ZERO, (vec2){1280.0f, 720.0f}, "resources/graphics/title/glitchy-blip/", 8);
+	a.freddy_face_sprite = sprite_create(GLM_VEC2_ZERO, (vec2){1280.0f, 720.0f}, "resources/graphics/title/freddy-face/", 4);
+	a.copyright_sprites = sprite_create(GLM_VEC2_ZERO, GLM_VEC2_ZERO, "resources/graphics/title/copyright/", 2);
+	a.menu_option_sprites = sprite_create((vec2){174.0f, 0.0f}, GLM_VEC2_ZERO, "resources/graphics/title/options/", 6);
+
 	a.music = sound_create("resources/audio/music/title-music.wav", 1.0f, 1.0f, GLM_VEC3_ZERO, 1);
 
 	title_loaded = 1;
@@ -62,6 +71,13 @@ void assets_title_destroy(assets_title_t *a) {
 		return;
 
 	sound_destroy(&a->music);
+
+	sprite_destroy(&a->menu_option_sprites);
+	sprite_destroy(&a->copyright_sprites);
+	sprite_destroy(&a->freddy_face_sprite);
+	sprite_destroy(&a->glitchy_blip);
+	sprite_destroy(&a->scanline_sprite);
+	sprite_destroy(&a->name_sprite);
 
 	title_loaded = 0;
 }

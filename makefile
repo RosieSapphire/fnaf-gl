@@ -5,8 +5,8 @@ CORES=-j8
 
 CFLAGS=-std=c99 -Wall -Wextra -Weverything
 
-SRC=main.c glad.c shader.c sprite.c sound.c mouse.c helpers.c file.c texture.c assets.c font.c
-OBJ=main.o glad.o shader.o sprite.o sound.o mouse.o helpers.o file.o texture.o assets.o font.o
+SRC=main.c glad.c shader.c sprite.c sound.c helpers.c file.c texture.c assets.c font.c
+OBJ=main.o glad.o shader.o sprite.o sound.o helpers.o file.o texture.o assets.o font.o
 
 BIN=five-nights-at-freddys
 

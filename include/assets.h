@@ -21,6 +21,12 @@ typedef struct {
 } assets_global_t;
 
 typedef struct {
+	sprite_t name_sprite;
+	sprite_t scanline_sprite;
+	sprite_t glitchy_blip;
+	sprite_t freddy_face_sprite;
+	sprite_t copyright_sprites;
+	sprite_t menu_option_sprites;
 	sound_t music;
 } assets_title_t;
 
