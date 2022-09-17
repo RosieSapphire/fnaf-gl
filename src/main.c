@@ -20,7 +20,9 @@
 #include "mouse.h"
 #include "helpers.h"
 
-#define TIME_MULTIPLIER 			32	
+#ifdef DEBUG
+	#define TIME_MULTIPLIER 			32	
+#endif
 
 #define WINDOW_WIDTH					1280
 #define WINDOW_HEIGHT					720
@@ -275,12 +277,14 @@ int main() {
 			glfwSetWindowShouldClose(window, 1);
 		}
 
+		#ifdef DEBUG
 		{
 			const float time_multiplier = (float)(glfwGetKey(window, GLFW_KEY_F) * TIME_MULTIPLIER) + 1.0f;
 			time_delta *= time_multiplier;
 			ticks *= time_multiplier;
 			time_now *= (double)time_multiplier;
 		}
+		#endif
 
 		if(glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !space_pressed) {
 			game_state = !game_state;
@@ -608,12 +612,16 @@ int main() {
 				glUniformMatrix4fv(glGetUniformLocation(ui_shader_program, "projection"), 1, GL_FALSE, (const GLfloat *)matrix_projection);
 				glUniform1f(glGetUniformLocation(ui_shader_program, "alpha"), 1.0f);
 
+				// printf("%.1f\n", (double)fmod2((float)time_now * 60.0f, 1.0f));
 				if(camera_state == CS_OPENED) {
-					uint8_t blink_state;
-					float blink_timer = fmod2((float)time_now * 0.4166667f, 1.0f);
+					uint8_t blink_state_dot;
+					uint8_t blink_state_buttons;
+					float blink_timer_dot = fmod2((float)time_now * ((2.0f / (100.0f * ANIMATION_FRAMETIME)) / 2.0f), 1.0f);
+					float blink_timer_buttons = fmod2((float)time_now * ((3.0f / (100.0f * ANIMATION_FRAMETIME)) / 2.0f), 1.0f);
 					const float camera_view_name_widths[11] = { 217.0f, 239.0f, 228.0f, 192.0f, 305.0f, 284.0f, 192.0f, 305.0f, 195.0f, 151.0f, 196.0f };
 	
-					blink_state = blink_timer < 0.5f;
+					blink_state_dot = blink_timer_dot < 0.5f;
+					blink_state_buttons = blink_timer_buttons < 0.5f;
 
 					glUniform1f(glGetUniformLocation(ui_shader_program, "alpha"), static_animation_alpha);
 					sprite_draw(assets_global.static_animation_sprite, ui_shader_program, static_animation_frame);
@@ -623,23 +631,25 @@ int main() {
 						sprite_draw(assets_global.blip_animation_sprite, ui_shader_program, blip_animation_frame);
 
 					sprite_draw(assets_game.camera_border_sprite, ui_shader_program, 0);
-					sprite_draw(assets_game.camera_map_sprite, ui_shader_program, blink_state);
+					sprite_draw(assets_game.camera_map_sprite, ui_shader_program, blink_state_dot);
 
+					/* draw camera name */
 					assets_game.camera_view_name_sprite.size[0] = camera_view_name_widths[camera_selected];
 					sprite_draw(assets_game.camera_view_name_sprite, ui_shader_program, camera_selected);
 
+					/* draw all camera buttons */
 					for(uint8_t i = 0; i < 11; i++) {
 						vec2 camera_button_position_current;
 						glm_vec3_sub(camera_button_positions[i], (vec2){29.0f, 19.0f}, camera_button_position_current);
 						glm_vec2_copy(camera_button_position_current, assets_game.camera_button_sprite.position);
-						sprite_draw(assets_game.camera_button_sprite, ui_shader_program, blink_state * (camera_selected == i));
+						sprite_draw(assets_game.camera_button_sprite, ui_shader_program, blink_state_buttons * (camera_selected == i));
 
 						glm_vec3_sub(camera_button_positions[i], (vec2){22.0f, 12.0f}, camera_button_position_current);
 						glm_vec2_copy(camera_button_position_current, assets_game.camera_button_name_sprite.position);
 						sprite_draw(assets_game.camera_button_name_sprite, ui_shader_program, i);
 					}
 
-					if(blink_state)
+					if(blink_state_dot)
 						sprite_draw(assets_game.camera_recording_sprite, ui_shader_program, 0);
 
 					if(camera_selected == 9) {
