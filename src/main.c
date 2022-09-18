@@ -568,7 +568,7 @@ int main() {
 				/* camera flipping */
 				{
 					const uint8_t camera_state_old = camera_state;
-					if(mouse_inside_box(mouse_position, (ivec4){75, 75 + 792, 653, 653 + 67}, 0.0f)) {
+					if(mouse_inside_box(mouse_position, (ivec4){75, 653, 792, 67}, 0.0f)) {
 						if(!camera_bar_hovering) {
 							camera_bar_hovering = 1;
 
@@ -645,7 +645,7 @@ int main() {
 					const int32_t mouse_offset = (int32_t)office_look_current;
 
 					if(camera_state != CS_OPENED) {
-						const ivec4 door_button_boxes[4] = {{27, 89, 251, 371}, {1519, 1581, 267, 387}, {25, 87, 393, 513}, {1519, 1581, 398, 518}};
+						const ivec4 door_button_boxes[4] = {{27, 251, 62, 120}, {1519, 267, 62, 120}, {25, 393, 62, 120}, {1519, 398, 62, 120}};
 						for(uint8_t i = 0; i < 2; i++) {
 							uint8_t door_button_bit_mask = (uint8_t)(DOOR_BUTTON_DOOR_FLAG << (i * 2));
 							if(!((uint8_t)door_frame_timers[i]) || (uint8_t)door_frame_timers[i] == 28) {
@@ -659,7 +659,7 @@ int main() {
 						}
 
 						/* pressing Freddy's nose */
-						if(mouse_inside_box(mouse_position, (ivec4){674, 682, 236, 244}, mouse_offset)) {
+						if(mouse_inside_box(mouse_position, (ivec4){674, 236, 8, 8}, mouse_offset)) {
 							sound_stop(assets_game.freddy_nose_sound);
 							sound_play(assets_game.freddy_nose_sound);
 						}
@@ -667,10 +667,16 @@ int main() {
 						/* selecting different cameras */
 						for(uint8_t i = 0; i < 11; i++) {
 							ivec4 camera_button_box_current;
+							camera_button_box_current[0] = (int32_t)camera_button_positions[i][0] - 29;
+							camera_button_box_current[1] = (int32_t)camera_button_positions[i][1] - 19;
+							camera_button_box_current[2] = 60.0f;
+							camera_button_box_current[3] = 40.0f;
+								/*
 							for(uint8_t j = 0; j < 4; j++) {
-								camera_button_box_current[j] = (int32_t)camera_button_positions[i][(int32_t)((float)j / 2.0f)];
+								//camera_button_box_current[j] = (int32_t)camera_button_positions[i][(int32_t)((float)j / 2.0f)];
 							}
-							glm_ivec4_sub(camera_button_box_current, (ivec4){29, -31, 19, -21}, camera_button_box_current);
+							*/
+							// glm_ivec4_sub(camera_button_box_current, (ivec4){29, -31, 19, -21}, camera_button_box_current);
 
 							if(mouse_inside_box(mouse_position, camera_button_box_current, 0.0f)) {
 								sound_play(assets_global.blip_sound);
