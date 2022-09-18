@@ -34,7 +34,7 @@ sudo apt-get install clang build-essential make git libopenal-dev libglfw3-dev l
 
 First we need to compile CGLM from source, since it doesn't seem to work with the apt package version.
 ```bash
-git clone https://github.com/resc/cglm.git
+git clone https://github.com/recp/cglm
 cd cglm
 mkdir build && cd build
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCGLM_USE_C99=ON
