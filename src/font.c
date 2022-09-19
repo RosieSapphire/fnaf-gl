@@ -75,7 +75,7 @@ font_t font_create(const char *path) {
 	return font;
 }
 
-void font_draw(const font_t font, const char *string, vec2 pos, const vec3 color, const float scale) {
+void font_draw(const font_t font, const char *string, float *pos, const float *color, const float scale) {
 	const char *string_pointer;
 
 	glUseProgram(font_shader);

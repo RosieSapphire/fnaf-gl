@@ -794,11 +794,11 @@ int main() {
 					/* draw all camera buttons */
 					for(uint8_t i = 0; i < 11; i++) {
 						vec2 camera_button_position_current;
-						glm_vec3_sub(camera_button_positions[i], (vec2){29.0f, 19.0f}, camera_button_position_current);
+						glm_vec2_sub(camera_button_positions[i], (vec2){29.0f, 19.0f}, camera_button_position_current);
 						glm_vec2_copy(camera_button_position_current, assets_game.camera_button_sprite.position);
 						sprite_draw(assets_game.camera_button_sprite, ui_shader_program, blink_state_buttons * (camera_selected == i));
 
-						glm_vec3_sub(camera_button_positions[i], (vec2){22.0f, 12.0f}, camera_button_position_current);
+						glm_vec2_sub(camera_button_positions[i], (vec2){22.0f, 12.0f}, camera_button_position_current);
 						glm_vec2_copy(camera_button_position_current, assets_game.camera_button_name_sprite.position);
 						sprite_draw(assets_game.camera_button_name_sprite, ui_shader_program, i);
 					}

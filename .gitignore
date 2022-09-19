@@ -5,3 +5,4 @@ resources/audio
 .cache/
 *.mfa
 *.001
+*.o

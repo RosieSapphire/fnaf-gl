@@ -29,7 +29,7 @@ in the resource folder. This is a temporary problem and will be fixed as the pro
 
 These examples are for debian-based distributions, but it'll work on anything as long as you know the correct package for your specific package manager.
 ```bash
-sudo apt-get install cmake clang build-essential make git libopenal-dev libglfw3-dev libsndfile-dev libalut-dev libfreetype-dev
+sudo apt-get install cmake clang build-essential make git libopenal-dev libglfw3-dev libsndfile-dev libalut-dev libfreetype-dev libc6 libc6-dev
 ```
 
 First we need to compile CGLM from source, since it doesn't seem to work with the apt package version.

@@ -1,9 +1,9 @@
-CC=clang
-INC=-Iinclude -I/usr/include
+CC=gcc
+INC=-Iinclude -I/usr/include -I/usr/include/freetype2
 LIB=-lglfw -lopenal -lsndfile -lfreetype -lm
 CORES=-j8
 
-CFLAGS=-std=c99 -Wall -Wextra -Weverything
+CFLAGS=-std=c99 -Wall -Wextra
 
 SRC=main.c glad.c shader.c sprite.c sound.c helpers.c file.c texture.c assets.c font.c
 OBJ=main.o glad.o shader.o sprite.o sound.o helpers.o file.o texture.o assets.o font.o
